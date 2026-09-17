@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: job_bot_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrations:
+    build:
+      context: .
+      dockerfile: src/bot/Dockerfile
+    container_name: job_bot_migrations
+    env_file: .env
+    environment:
+      DB_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python migrate.py
+
+  bot:
+    build:
+      context: .
+      dockerfile: src/bot/Dockerfile
+    container_name: job_bot_app
+    restart: always
+    env_file: .env
+    environment:
+      DB_HOST: db
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    command: python src/bot/run.py
+
+volumes:
+  postgres_data:
