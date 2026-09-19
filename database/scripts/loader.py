@@ -1,5 +1,16 @@
 import os
 import re
+import sys
+from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+BOT_DIR = PROJECT_ROOT / "apps" / "bot"
+
+for p in (PROJECT_ROOT, BOT_DIR):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
+
 from yoyo import step
 from src.config import SQL_DIR
 
