@@ -1,0 +1,6 @@
+pg_version = "18.0"
+excluded_rules = [
+"require-concurrent-index-creation",
+"require-concurrent-index-deletion",
+]
+assume_in_transaction = false
