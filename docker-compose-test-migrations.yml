@@ -1,0 +1,34 @@
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=${DB_TEST_MIGRATIONS_USER}
+      - POSTGRES_PASSWORD=${DB_TEST_MIGRATIONS_PASSWORD}
+      - POSTGRES_DB=${DB_TEST_MIGRATIONS_NAME}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_TEST_MIGRATIONS_USER} -d ${DB_TEST_MIGRATIONS_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks: [migr_net]
+
+  migrator:
+    image: migrate/migrate
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ./database/migrations
+        target: /migrations
+    command:
+      - -path=/migrations
+      - -database
+      - postgres://${DB_TEST_MIGRATIONS_USER}:${DB_TEST_MIGRATIONS_PASSWORD}@database:5432/${DB_TEST_MIGRATIONS_NAME}?sslmode=disable
+      - up
+    restart: "no"
+    networks: [migr_net]
+
+networks:
+  migr_net:
+    driver: bridge
