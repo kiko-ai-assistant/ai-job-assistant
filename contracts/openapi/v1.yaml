@@ -1,0 +1,124 @@
+openapi: 3.0.3
+info:
+  title: Kiko API Contracts
+  description: Central REST API specification for Kiko Core Backend (Go), consumed by Web Client, Telegram Bot, and Workers.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
+  /vacancies:
+    get:
+      summary: List vacancies
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of vacancies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vacancy'
+
+    post:
+      summary: Ingest new vacancies (used by parsers)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Vacancy'
+      responses:
+        '201':
+          description: Created
+
+  /users/{id}/recommendations:
+    get:
+      summary: Get personalized vacancy recommendations for a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Recommendations list with Match Score and AI Summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserVacancy'
+
+components:
+  schemas:
+    Vacancy:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        company:
+          type: string
+        source:
+          type: string
+        salary:
+          type: string
+        location:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    UserVacancy:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        vacancy_id:
+          type: integer
+        match_score:
+          type: number
+          format: float
+          example: 85.5
+        ai_summary:
+          type: string
+        cover_letter:
+          type: string
+        is_seen:
+          type: boolean
+        is_favorite:
+          type: boolean

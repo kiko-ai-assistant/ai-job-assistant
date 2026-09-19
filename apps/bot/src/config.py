@@ -4,18 +4,22 @@ from dotenv import load_dotenv
 
 from src.utils.exceptions import EnvVarMissingError
 
-load_dotenv()
+APP_DIR = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# Load .env from app dir first, then fallback to repo root
+load_dotenv(APP_DIR / ".env")
+load_dotenv(REPO_ROOT / ".env")
 
 # --- Data filepaths ---
-BASE_DIR = Path(__file__).resolve().parent.parent
-
+BASE_DIR = REPO_ROOT
 DATA_DIR = BASE_DIR / os.getenv("DATA_DIR", "data")
 
 MEDIA_DIR = DATA_DIR / os.getenv("MEDIA_DIR", "media")
 LOGS_DIR = DATA_DIR / os.getenv("LOGS_DIR", "logs")
 
-MIGRATIONS_DIR = DATA_DIR / os.getenv("MIGRATIONS_DIR", "migrations")
-SQL_DIR = MIGRATIONS_DIR / "sql"
+MIGRATIONS_DIR = BASE_DIR / os.getenv("MIGRATIONS_DIR", "database/migrations")
+SQL_DIR = MIGRATIONS_DIR
 
 CVS_DIR = DATA_DIR / os.getenv("CVS_DIR", "cvs")
 
