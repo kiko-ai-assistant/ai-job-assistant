@@ -1,6 +1,6 @@
 -- Vacancies table
 CREATE TABLE IF NOT EXISTS vacancies (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     external_id TEXT NOT NULL,  -- ID of vacancy in HH.ru, Telegram channels or other sources
     source TEXT NOT NULL,  -- Such as HH.ru, LinkedIn, Telegram
     title TEXT NOT NULL,
