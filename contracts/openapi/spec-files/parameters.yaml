@@ -1,0 +1,150 @@
+components:
+  parameters:
+    # ----------------------------------------
+    # Path parameters
+    # ----------------------------------------
+    UserId:
+      name: id
+      in: path
+      required: true
+      description: Internal numeric ID of the user (users.id).
+      schema:
+        type: integer
+        format: int64
+        example: 1
+
+    TelegramId:
+      name: telegram_id
+      in: path
+      required: true
+      description: Telegram numeric ID of the user (users.telegram_id).
+      schema:
+        type: integer
+        format: int64
+        example: 123456789
+
+    TelegramUsername:
+      name: username
+      in: path
+      required: true
+      description: >-
+        Telegram username of the user (users.username), without the leading "@".
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_]{5,32}$'
+        example: "johndoe"
+
+    VacancyId:
+      name: id
+      in: path
+      required: true
+      description: Internal numeric ID of the vacancy (vacancies.id).
+      schema:
+        type: integer
+        format: int64
+        example: 101
+
+    VacancyIdInUserContext:
+      name: vacancy_id
+      in: path
+      required: true
+      description: Internal numeric ID of the vacancy, scoped under a user's recommendations.
+      schema:
+        type: integer
+        format: int64
+        example: 101
+
+    # ----------------------------------------
+    # Pagination
+    # ----------------------------------------
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return.
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+
+    Offset:
+      name: offset
+      in: query
+      required: false
+      description: Number of items to skip, for pagination.
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+
+    PendingTasksLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of matching tasks to return.
+      schema:
+        type: integer
+        default: 100
+        minimum: 1
+        maximum: 500
+
+    # ----------------------------------------
+    # Vacancy filters
+    # ----------------------------------------
+    VacancySource:
+      name: source
+      in: query
+      required: false
+      description: Filter by source platform (e.g. HH.ru, Telegram).
+      schema:
+        type: string
+        example: "HH.ru"
+
+    VacancyCompany:
+      name: company
+      in: query
+      required: false
+      description: Search by company name.
+      schema:
+        type: string
+        example: "Acme Corp"
+
+    VacancyLocation:
+      name: location
+      in: query
+      required: false
+      description: Filter by vacancy location.
+      schema:
+        type: string
+        example: "Moscow"
+
+    # ----------------------------------------
+    # Recommendation filters
+    # ----------------------------------------
+    MinScore:
+      name: min_score
+      in: query
+      required: false
+      description: Minimum match score filter (0-100).
+      schema:
+        type: integer
+        default: 40
+        minimum: 0
+        maximum: 100
+
+    IsSeen:
+      name: is_seen
+      in: query
+      required: false
+      description: Filter recommendations by seen status.
+      schema:
+        type: boolean
+
+    IsFavorite:
+      name: is_favorite
+      in: query
+      required: false
+      description: Filter recommendations by favorite status.
+      schema:
+        type: boolean

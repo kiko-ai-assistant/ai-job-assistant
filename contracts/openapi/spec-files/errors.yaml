@@ -1,0 +1,90 @@
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message.
+          example: "Resource not found"
+        details:
+          type: string
+          nullable: true
+          description: Optional additional context (e.g. which field failed validation).
+          example: "field 'first_name' is required"
+
+  responses:
+    Unauthorized:
+      description: >-
+        Missing, malformed, or expired credentials (Bearer JWT or Service API Key).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Unauthorized"
+
+    Forbidden:
+      description: >-
+        Credentials are valid, but do not grant access to this resource,
+        e.g. a Bearer token for user A used to access user B's data
+        (token's subject must match the {id} path parameter).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Forbidden: token does not match requested user"
+
+    BadRequest:
+      description: The request body or query parameters are malformed or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Invalid request body"
+
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Not found"
+
+    Conflict:
+      description: >-
+        The request conflicts with the current state of the resource,
+        e.g. a duplicate (source, external_id) pair for vacancies,
+        or a duplicate telegram_id for users.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Resource already exists"
+
+    UnprocessableEntity:
+      description: >-
+        The request is well-formed but fails semantic/business validation,
+        e.g. match_score outside the 0-100 range enforced by the DB CHECK
+        constraint, or an invalid enum value for grade/employment_type/language.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "match_score must be between 0 and 100"
+
+    InternalServerError:
+      description: An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Internal server error"

@@ -1,0 +1,504 @@
+components:
+  schemas:
+    # ----------------------------------------
+    # System
+    # ----------------------------------------
+    HealthStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: "ok"
+        db:
+          type: string
+          description: Database connectivity status.
+          example: "ok"
+          nullable: true
+
+    # ----------------------------------------
+    # Enums (matches Postgres ENUM types)
+    # ----------------------------------------
+    InterfaceLang:
+      type: string
+      description: Matches `interface_lang` Postgres enum (migration 0001).
+      enum: [EN, RU, CN]
+      example: EN
+
+    Grade:
+      type: string
+      description: Matches `grade` Postgres enum (migration 0003).
+      enum: [INTERN, JUNIOR, MIDDLE, SENIOR, LEAD]
+      example: MIDDLE
+
+    EmploymentType:
+      type: string
+      description: Matches `employment_type` Postgres enum (migration 0003).
+      enum: [REMOTE, OFFICE, HYBRID, CONTRACT]
+      example: REMOTE
+
+    # ----------------------------------------
+    # User Schemas (table: users)
+    # ----------------------------------------
+    User:
+      type: object
+      required:
+        - id
+        - telegram_id
+        - first_name
+        - language
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        telegram_id:
+          type: integer
+          format: int64
+          description: Unique Telegram numeric ID (BIGINT UNIQUE NOT NULL in DB).
+          example: 123456789
+        username:
+          type: string
+          nullable: true
+          example: "johndoe"
+        first_name:
+          type: string
+          example: "John"
+        last_name:
+          type: string
+          nullable: true
+          example: "Doe"
+        language:
+          allOf:
+            - $ref: '#/components/schemas/InterfaceLang'
+          description: Defaults to EN at DB level.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateOrUpdateUserRequest:
+      type: object
+      required:
+        - telegram_id
+        - first_name
+      properties:
+        telegram_id:
+          type: integer
+          format: int64
+          example: 123456789
+        username:
+          type: string
+          example: "johndoe"
+        first_name:
+          type: string
+          example: "John"
+        last_name:
+          type: string
+          example: "Doe"
+        language:
+          $ref: '#/components/schemas/InterfaceLang'
+
+    PatchUserRequest:
+      type: object
+      description: All fields optional; only provided fields are updated.
+      properties:
+        username:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        language:
+          $ref: '#/components/schemas/InterfaceLang'
+
+    # ----------------------------------------
+    # User Settings Schemas (table: user_settings)
+    # ----------------------------------------
+    UserSettings:
+      type: object
+      required:
+        - id
+        - user_id
+        - skills
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        skills:
+          type: array
+          description: Stored as jsonb, defaults to empty array at DB level.
+          items:
+            type: string
+          example: ["Go", "PostgreSQL", "Docker"]
+        grade:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/Grade'
+          nullable: true
+        employment_type:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/EmploymentType'
+          nullable: true
+        location:
+          type: string
+          nullable: true
+          example: "Moscow, Russia"
+        updated_at:
+          type: string
+          format: date-time
+
+    UpsertUserSettingsRequest:
+      type: object
+      properties:
+        skills:
+          type: array
+          items:
+            type: string
+          example: ["Go", "Kubernetes", "PostgreSQL"]
+        grade:
+          $ref: '#/components/schemas/Grade'
+        employment_type:
+          $ref: '#/components/schemas/EmploymentType'
+        location:
+          type: string
+          example: "Remote"
+
+    # ----------------------------------------
+    # CV Schemas (table: cvs)
+    # ----------------------------------------
+    CV:
+      type: object
+      description: >-
+        Metadata of the user's CV. cv_path points to the stored file
+        (local storage or object storage); use GET /users/{id}/cv/download
+        to fetch the actual file content. Note: the DB does not persist
+        extracted CV text — text extraction (see MatchingTask.cv_text)
+        happens on read, it is not a stored column.
+      required:
+        - id
+        - user_id
+        - cv_file_id
+        - cv_path
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          description: One CV per user (UNIQUE constraint on user_id).
+          example: 1
+        cv_file_id:
+          type: string
+          description: Original file identifier (e.g. Telegram file_id).
+          example: "AgACAgIAAxkBAAI..."
+        cv_path:
+          type: string
+          description: Path/key where the CV file is stored server-side.
+          example: "/storage/cvs/user_1_resume.pdf"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UpsertCVRequest:
+      type: object
+      required:
+        - cv_file_id
+        - cv_path
+      properties:
+        cv_file_id:
+          type: string
+          example: "BAACAgIAAxkBA..."
+        cv_path:
+          type: string
+          example: "/storage/cvs/user_1_resume.pdf"
+
+    # ----------------------------------------
+    # Vacancy Schemas (table: vacancies)
+    # ----------------------------------------
+    Vacancy:
+      type: object
+      required:
+        - id
+        - external_id
+        - source
+        - title
+        - url
+        - created_at
+        - parsed_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 101
+        external_id:
+          type: string
+          description: ID of the vacancy at the source platform. Unique together with `source`.
+          example: "12345678"
+        source:
+          type: string
+          example: "HH.ru"
+        title:
+          type: string
+          example: "Junior Golang Developer"
+        company:
+          type: string
+          nullable: true
+          example: "Acme Corp"
+        salary_text:
+          type: string
+          nullable: true
+          example: "150 000 - 200 000 RUB"
+        location:
+          type: string
+          nullable: true
+          example: "Moscow / Remote"
+        description:
+          type: string
+          nullable: true
+          example: "Требуется Go разработчик с опытом..."
+        url:
+          type: string
+          example: "https://hh.ru/vacancy/12345678"
+        created_at:
+          type: string
+          format: date-time
+        parsed_at:
+          type: string
+          format: date-time
+
+    CreateVacancyRequest:
+      type: object
+      required:
+        - external_id
+        - source
+        - title
+        - url
+      properties:
+        external_id:
+          type: string
+          example: "12345678"
+        source:
+          type: string
+          example: "HH.ru"
+        title:
+          type: string
+          example: "Go Developer"
+        company:
+          type: string
+          example: "Acme Corp"
+        salary_text:
+          type: string
+          example: "до 250 000 руб."
+        location:
+          type: string
+          example: "Remote"
+        description:
+          type: string
+          example: "Описание вакансии..."
+        url:
+          type: string
+          example: "https://hh.ru/vacancy/12345678"
+
+    BatchCreateVacanciesRequest:
+      type: object
+      required:
+        - vacancies
+      properties:
+        vacancies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateVacancyRequest'
+
+    BatchIngestVacanciesResponse:
+      type: object
+      required:
+        - inserted
+        - ignored
+      properties:
+        inserted:
+          type: integer
+          example: 25
+        ignored:
+          type: integer
+          description: Count of duplicates skipped due to (source, external_id) uniqueness.
+          example: 3
+
+    # ----------------------------------------
+    # UserVacancy & Recommendation Schemas (table: user_vacancies)
+    # ----------------------------------------
+    UserVacancy:
+      type: object
+      required:
+        - id
+        - user_id
+        - vacancy_id
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        vacancy_id:
+          type: integer
+          format: int64
+          example: 101
+        match_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: NULL until the AI worker scores this pair. DB enforces CHECK (0-100).
+          example: 85
+        ai_summary:
+          type: string
+          nullable: true
+          example: "Вакансия отлично подходит по стеку Go и Docker, компания предлагает удаленку."
+        cover_letter:
+          type: string
+          nullable: true
+          example: "Здравствуйте! Меня заинтересовала позиция Go разработчика..."
+        is_seen:
+          type: boolean
+          nullable: true
+          description: NULL/false until the user opens the recommendation. No DB default.
+          example: false
+        is_favorite:
+          type: boolean
+          nullable: true
+          description: NULL/false until the user favorites the recommendation. No DB default.
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserVacancyWithDetails:
+      allOf:
+        - $ref: '#/components/schemas/UserVacancy'
+        - type: object
+          properties:
+            vacancy:
+              $ref: '#/components/schemas/Vacancy'
+
+    PatchUserVacancyRequest:
+      type: object
+      properties:
+        is_seen:
+          type: boolean
+          example: true
+        is_favorite:
+          type: boolean
+          example: true
+
+    GenerateCoverLetterRequest:
+      type: object
+      properties:
+        prompt_override:
+          type: string
+          description: Optional specific focus for cover letter generation.
+          example: "Сделай упор на мой опыт работы с PostgreSQL и highload"
+
+    CoverLetterResponse:
+      type: object
+      required:
+        - cover_letter
+      properties:
+        cover_letter:
+          type: string
+          example: "Здравствуйте! Увидел вакансию в Acme Corp..."
+
+    # ----------------------------------------
+    # AI Worker Task Schemas (internal)
+    # ----------------------------------------
+    MatchingTask:
+      type: object
+      required:
+        - user_id
+        - vacancy_id
+        - user_settings
+        - vacancy
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        vacancy_id:
+          type: integer
+          format: int64
+        user_settings:
+          $ref: '#/components/schemas/UserSettings'
+        cv_text:
+          type: string
+          nullable: true
+          description: >-
+            Extracted CV text, computed on the fly from the file at cv_path
+            (not a persisted DB column). Null if the user has no CV.
+        vacancy:
+          $ref: '#/components/schemas/Vacancy'
+
+    SaveMatchResultRequest:
+      type: object
+      required:
+        - user_id
+        - vacancy_id
+        - match_score
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        vacancy_id:
+          type: integer
+          format: int64
+        match_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 85
+        ai_summary:
+          type: string
+          example: "Отличное совпадение по языку Go и опыту с базами данных."
+
+    BatchSaveMatchResultsRequest:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaveMatchResultRequest'
+
+    BatchSaveMatchResultsResponse:
+      type: object
+      required:
+        - saved_count
+      properties:
+        saved_count:
+          type: integer
+          example: 50

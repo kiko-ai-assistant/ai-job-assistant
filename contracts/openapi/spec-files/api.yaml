@@ -1,0 +1,658 @@
+openapi: 3.0.3
+info:
+  title: Kiko API Contracts
+  description: >-
+    Central REST API specification for Kiko Core Backend (Go).
+    Consumed by Web Client, Telegram Bot Client, Parsers, and AI Worker.
+  version: 1.1.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Issued to a specific user (JWT `sub` claim = users.id) after Telegram
+        identity verification (Telegram Login Widget for the web client, or
+        Telegram's own auth for the bot backend acting on behalf of the user).
+        End-user clients never see the Kiko API directly — only the Web/Bot
+        backend does, on behalf of the currently logged-in user. The server
+        MUST verify that the token's subject matches the `{id}` path
+        parameter on every `/users/{id}/**` call, returning 403 otherwise.
+    ServiceApiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: >-
+        Static key for trusted backend-to-backend callers that act on behalf
+        of the platform rather than a single end user: the Vacancy Parser,
+        the AI Matching Worker, and the Bot/Web backend's own bootstrap calls
+        (creating/looking up a user before a personal Bearer token exists).
+        Never exposed to browsers or the Telegram client directly.
+
+tags:
+  - name: System
+    description: Health check and status endpoints
+  - name: Users
+    description: User profile management and authentication
+  - name: User Settings
+    description: Search preferences (skills, grade, employment type, location)
+  - name: CV
+    description: User CV and resume management
+  - name: Vacancies
+    description: Vacancy catalog and parser ingestion
+  - name: Recommendations
+    description: Personalized user vacancies, matching results, and interactions
+  - name: Internal AI
+    description: Internal endpoints for AI-Worker (matching and scoring)
+
+paths:
+  # ==========================================
+  # SYSTEM
+  # ==========================================
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Returns health status of the backend and database connection.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/HealthStatus'
+
+  # ==========================================
+  # USERS
+  # ==========================================
+  /users:
+    post:
+      tags:
+        - Users
+      summary: Register or sync user
+      description: >-
+        Create a new user or retrieve existing by Telegram ID (upsert on telegram_id).
+        Called only by the trusted Bot/Web backend, which has already verified
+        the caller's Telegram identity — end-user clients never call this directly.
+      security:
+        - ServiceApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/CreateOrUpdateUserRequest'
+      responses:
+        '200':
+          description: User retrieved or updated
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Users
+      summary: Update user profile
+      description: Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/PatchUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+  /users/by-telegram/{telegram_id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by Telegram ID
+      description: >-
+        Fast lookup for the Telegram Bot backend, used during session bootstrap
+        (before a personal Bearer token exists for this chat).
+      security:
+        - ServiceApiKey: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/TelegramId'
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+  /users/by-username/{username}:
+    get:
+      tags:
+        - Users
+      summary: Get user by Telegram username
+      description: >-
+        Lookup by Telegram @username (case-insensitive, without the leading "@").
+        Restricted to trusted backends, since a username is public/guessable
+        and this reveals whether it is registered plus the linked profile.
+        `users.username` is nullable (not every Telegram user has one) but
+        enforced unique among non-null values via a case-insensitive partial
+        unique index (migration 0006), so this always resolves to at most
+        one user.
+      security:
+        - ServiceApiKey: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/TelegramUsername'
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+  # ==========================================
+  # USER SETTINGS
+  # ==========================================
+  /users/{id}/settings:
+    get:
+      tags:
+        - User Settings
+      summary: Get user search settings
+      description: Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User settings found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/UserSettings'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+    put:
+      tags:
+        - User Settings
+      summary: Create or update user search settings
+      description: Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/UpsertUserSettingsRequest'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/UserSettings'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './errors.yaml#/components/responses/UnprocessableEntity'
+
+  # ==========================================
+  # CV (RESUME)
+  # ==========================================
+  /users/{id}/cv:
+    get:
+      tags:
+        - CV
+      summary: Get user's CV metadata
+      description: >-
+        Returns CV metadata only (file_id, storage path, timestamps). Use
+        /cv/download to fetch the actual file. Requires a Bearer token whose
+        subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '200':
+          description: CV found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/CV'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+    post:
+      tags:
+        - CV
+      summary: Attach or update user's CV
+      description: Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/UpsertCVRequest'
+      responses:
+        '200':
+          description: CV saved
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/CV'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - CV
+      summary: Delete user's CV
+      description: Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '204':
+          description: CV deleted
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+  /users/{id}/cv/download:
+    get:
+      tags:
+        - CV
+      summary: Download user's CV file
+      description: >-
+        Streams the raw CV file content (PDF/DOCX) referenced by cv_path,
+        so the web client or Telegram bot can display or re-send the actual
+        resume rather than just its metadata. Requires a Bearer token whose
+        subject matches `{id}` — this is the most sensitive endpoint in the
+        API (raw personal document), so the ownership check is mandatory.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '200':
+          description: CV file content
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+  # ==========================================
+  # VACANCIES
+  # ==========================================
+  /vacancies:
+    get:
+      tags:
+        - Vacancies
+      summary: List catalog vacancies
+      description: Public read-only catalog browsing; contains no user-specific data.
+      security: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/VacancySource'
+        - $ref: './parameters.yaml#/components/parameters/VacancyCompany'
+        - $ref: './parameters.yaml#/components/parameters/VacancyLocation'
+        - $ref: './parameters.yaml#/components/parameters/Limit'
+        - $ref: './parameters.yaml#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List of vacancies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './models.yaml#/components/schemas/Vacancy'
+
+    post:
+      tags:
+        - Vacancies
+      summary: Ingest single vacancy (Parser)
+      description: Called only by the trusted Vacancy Parser service.
+      security:
+        - ServiceApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/CreateVacancyRequest'
+      responses:
+        '201':
+          description: Vacancy ingested
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/Vacancy'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '409':
+          $ref: './errors.yaml#/components/responses/Conflict'
+
+  /vacancies/batch:
+    post:
+      tags:
+        - Vacancies
+      summary: Batch ingest vacancies (Parser)
+      description: Recommended endpoint for parsers to batch-upload parsed vacancies. Duplicates (by source + external_id) are silently skipped and counted in `ignored`.
+      security:
+        - ServiceApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/BatchCreateVacanciesRequest'
+      responses:
+        '200':
+          description: Batch ingestion result
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/BatchIngestVacanciesResponse'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+
+  /vacancies/{id}:
+    get:
+      tags:
+        - Vacancies
+      summary: Get vacancy details by ID
+      description: Public read-only; contains no user-specific data.
+      security: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/VacancyId'
+      responses:
+        '200':
+          description: Vacancy found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/Vacancy'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+  # ==========================================
+  # RECOMMENDATIONS & USER VACANCIES
+  # ==========================================
+  /users/{id}/recommendations:
+    get:
+      tags:
+        - Recommendations
+      summary: Get personalized recommendations for user
+      description: >-
+        Returns scored vacancies with match score and AI summary. Requires a
+        Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+        - $ref: './parameters.yaml#/components/parameters/MinScore'
+        - $ref: './parameters.yaml#/components/parameters/IsSeen'
+        - $ref: './parameters.yaml#/components/parameters/IsFavorite'
+        - $ref: './parameters.yaml#/components/parameters/Limit'
+        - $ref: './parameters.yaml#/components/parameters/Offset'
+      responses:
+        '200':
+          description: List of recommendations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './models.yaml#/components/schemas/UserVacancyWithDetails'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+  /users/{id}/vacancies/{vacancy_id}:
+    get:
+      tags:
+        - Recommendations
+      summary: Get user recommendation status for a specific vacancy
+      description: Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+        - $ref: './parameters.yaml#/components/parameters/VacancyIdInUserContext'
+      responses:
+        '200':
+          description: Details found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/UserVacancyWithDetails'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - Recommendations
+      summary: Update seen or favorite state
+      description: Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+        - $ref: './parameters.yaml#/components/parameters/VacancyIdInUserContext'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/PatchUserVacancyRequest'
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/UserVacancy'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+
+  /users/{id}/vacancies/{vacancy_id}/cover-letter:
+    post:
+      tags:
+        - Recommendations
+      summary: Generate or retrieve AI Cover Letter
+      description: >-
+        Generates a tailored cover letter based on user profile, CV, and
+        vacancy. Requires a Bearer token whose subject matches `{id}`.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+        - $ref: './parameters.yaml#/components/parameters/VacancyIdInUserContext'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/GenerateCoverLetterRequest'
+      responses:
+        '200':
+          description: Cover letter generated
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/CoverLetterResponse'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  # ==========================================
+  # INTERNAL / AI WORKER
+  # ==========================================
+  /internal/matching/pending-tasks:
+    get:
+      tags:
+        - Internal AI
+      summary: Get unscored pairs for matching
+      description: >-
+        Returns users and newly ingested vacancies ready for AI analysis.
+        Called only by the trusted AI Matching Worker.
+      security:
+        - ServiceApiKey: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/PendingTasksLimit'
+      responses:
+        '200':
+          description: List of pending matching tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './models.yaml#/components/schemas/MatchingTask'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+
+  /internal/matching/results:
+    post:
+      tags:
+        - Internal AI
+      summary: Save batch of match results
+      description: >-
+        AI Worker sends calculated match scores and summaries. Called only
+        by the trusted AI Matching Worker.
+      security:
+        - ServiceApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/BatchSaveMatchResultsRequest'
+      responses:
+        '200':
+          description: Results saved
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/BatchSaveMatchResultsResponse'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '422':
+          $ref: './errors.yaml#/components/responses/UnprocessableEntity'
