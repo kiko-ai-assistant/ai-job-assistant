@@ -24,7 +24,7 @@ func NewCV(userID uuid.UUID, fileID, path string) (*CV, error) {
 		return nil, pkgerrs.NewValueRequiredError("user_id")
 	}
 	if fileID == "" {
-		return nil, pkgerrs.NewValueRequiredError("fileID")
+		return nil, pkgerrs.NewValueRequiredError("file_id")
 	}
 	if path == "" {
 		return nil, pkgerrs.NewValueRequiredError("path")
@@ -70,7 +70,7 @@ func (cv *CV) UpdatedAt() time.Time { return cv.updatedAt }
 
 func (cv *CV) Update(fileID, path string) error {
 	if fileID == "" {
-		return pkgerrs.NewValueRequiredError("fileID")
+		return pkgerrs.NewValueRequiredError("file_id")
 	}
 	if path == "" {
 		return pkgerrs.NewValueRequiredError("path")
