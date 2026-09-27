@@ -12,11 +12,11 @@ CREATE TABLE IF NOT EXISTS vacancies (
     salary_to INT,
     currency VARCHAR(3),  -- USD, RUB, CNY
 
-    grade grade,  -- Intern/Junior/Senior and etc
-    employment_type employment_type,
+    grade grade NOT NULL,  -- Intern/Junior/Senior and etc
+    employment_type employment_type NOT NULL,
 
     location TEXT,
-    description TEXT,
+    description TEXT NOT NULL,
     url TEXT NOT NULL,
 
     published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

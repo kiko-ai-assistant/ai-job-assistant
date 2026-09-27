@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// ================ Interface Language value object ================
+
 type InterfaceLang string
 
 const (
@@ -27,7 +29,7 @@ func (l InterfaceLang) IsValid() bool {
 	return false
 }
 
-// ================ Rich model for User ================
+// ================ Rich model of User ================
 
 type User struct {
 	id         uuid.UUID

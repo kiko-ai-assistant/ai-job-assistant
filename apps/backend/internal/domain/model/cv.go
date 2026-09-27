@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// ================ Rich model for CV ================
+// ================ Rich model of CV ================
 
 type CV struct {
 	id        uuid.UUID
