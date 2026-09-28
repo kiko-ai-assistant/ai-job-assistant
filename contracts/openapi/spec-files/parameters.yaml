@@ -13,27 +13,6 @@ components:
         format: int64
         example: 1
 
-    TelegramId:
-      name: telegram_id
-      in: path
-      required: true
-      description: Telegram numeric ID of the user (users.telegram_id).
-      schema:
-        type: integer
-        format: int64
-        example: 123456789
-
-    TelegramUsername:
-      name: username
-      in: path
-      required: true
-      description: >-
-        Telegram username of the user (users.username), without the leading "@".
-      schema:
-        type: string
-        pattern: '^[A-Za-z0-9_]{5,32}$'
-        example: "johndoe"
-
     VacancyId:
       name: id
       in: path
@@ -44,7 +23,7 @@ components:
         format: int64
         example: 101
 
-    VacancyIdInUserContext:
+    RecommendationVacancyId:
       name: vacancy_id
       in: path
       required: true
@@ -53,6 +32,34 @@ components:
         type: integer
         format: int64
         example: 101
+
+    # ----------------------------------------
+    # User lookup (exactly one must be supplied)
+    # ----------------------------------------
+    LookupTelegramId:
+      name: telegram_id
+      in: query
+      required: false
+      description: >-
+        Telegram numeric ID (users.telegram_id). Exactly one of `telegram_id`
+        or `username` must be supplied, otherwise 400.
+      schema:
+        type: integer
+        format: int64
+        example: 123456789
+
+    LookupUsername:
+      name: username
+      in: query
+      required: false
+      description: >-
+        Telegram username (users.username), case-insensitive, without the
+        leading "@". Exactly one of `telegram_id` or `username` must be
+        supplied, otherwise 400.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_]{5,32}$'
+        example: "johndoe"
 
     # ----------------------------------------
     # Pagination

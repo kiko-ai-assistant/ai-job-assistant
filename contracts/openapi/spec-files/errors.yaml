@@ -1,90 +1,420 @@
 components:
+  # ==========================================
+  # Headers returned with error responses
+  # ==========================================
+  headers:
+    RequestId:
+      description: >-
+        Unique ID of the request. The same value is returned in `error.request_id`.
+        Quote it when reporting a problem.
+      schema:
+        type: string
+        example: "req_7f3a9c1e2b"
+    WwwAuthenticate:
+      description: Authentication challenge, as required by RFC 9110 for 401 responses.
+      schema:
+        type: string
+        example: 'Bearer realm="kiko", error="invalid_token"'
+    RetryAfter:
+      description: Number of seconds to wait before retrying the request.
+      schema:
+        type: integer
+        minimum: 1
+        example: 30
+
   schemas:
+    # ==========================================
+    # Error model
+    # ==========================================
+    ErrorCode:
+      type: string
+      description: >-
+        Stable machine-readable error code. Clients should branch on this value,
+        not on `message` (which is human-readable and may change).
+
+
+        | code | HTTP | meaning |
+
+        |---|---|---|
+
+        | `invalid_request` | 400 | Malformed JSON, wrong type, bad query/path parameter |
+
+        | `unauthenticated` | 401 | Credentials missing or invalid |
+
+        | `token_expired` | 401 | Bearer token expired — log in again |
+
+        | `permission_denied` | 403 | Valid credentials, but not the owner of the resource |
+
+        | `not_found` | 404 | Resource does not exist |
+
+        | `conflict` | 409 | Violates a uniqueness constraint |
+
+        | `payload_too_large` | 413 | Uploaded file exceeds the size limit |
+
+        | `unsupported_media_type` | 415 | Unsupported request content type or file format |
+
+        | `validation_failed` | 422 | Well-formed request that breaks a business rule |
+
+        | `rate_limited` | 429 | Too many requests |
+
+        | `internal_error` | 500 | Unexpected server error |
+      enum:
+        - invalid_request
+        - unauthenticated
+        - token_expired
+        - permission_denied
+        - not_found
+        - conflict
+        - payload_too_large
+        - unsupported_media_type
+        - validation_failed
+        - rate_limited
+        - internal_error
+      example: validation_failed
+
+    ErrorDetail:
+      type: object
+      description: A problem with one specific field or parameter.
+      required:
+        - message
+      properties:
+        location:
+          type: string
+          description: Where the offending value was found.
+          enum: [body, query, path, header]
+          example: body
+        field:
+          type: string
+          description: Name of the field/parameter (dot notation for nested fields).
+          example: match_score
+        reason:
+          type: string
+          description: >-
+            Short machine-readable reason, e.g. `required`, `out_of_range`,
+            `invalid_enum`, `already_exists`, `malformed`, `not_found`.
+          example: out_of_range
+        message:
+          type: string
+          description: Human-readable explanation.
+          example: match_score must be between 0 and 100
+
+    ErrorBody:
+      type: object
+      required:
+        - code
+        - message
+        - request_id
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          description: Human-readable summary of what went wrong.
+          example: The request failed validation.
+        details:
+          type: array
+          description: Per-field problems. Present for 400/409/422 and for lookups by parameter.
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+        request_id:
+          type: string
+          description: Same value as the `X-Request-Id` response header.
+          example: "req_7f3a9c1e2b"
+
     ErrorResponse:
       type: object
+      description: Envelope used by every error response of the API.
       required:
         - error
       properties:
         error:
-          type: string
-          description: Human-readable error message.
-          example: "Resource not found"
-        details:
-          type: string
-          nullable: true
-          description: Optional additional context (e.g. which field failed validation).
-          example: "field 'first_name' is required"
+          $ref: '#/components/schemas/ErrorBody'
 
+  # ==========================================
+  # Reusable error responses
+  # ==========================================
   responses:
-    Unauthorized:
+    BadRequest:
       description: >-
-        Missing, malformed, or expired credentials (Bearer JWT or Service API Key).
+        The request is malformed: invalid JSON, wrong field type, or an invalid
+        query/path parameter. Business-rule violations use 422 instead.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error: "Unauthorized"
+          examples:
+            malformed_json:
+              summary: Request body is not valid JSON
+              value:
+                error:
+                  code: invalid_request
+                  message: The request body is not valid JSON.
+                  request_id: "req_7f3a9c1e2b"
+            invalid_query_param:
+              summary: Query parameter out of bounds
+              value:
+                error:
+                  code: invalid_request
+                  message: One or more parameters are invalid.
+                  details:
+                    - location: query
+                      field: limit
+                      reason: out_of_range
+                      message: limit must be between 1 and 100
+                  request_id: "req_7f3a9c1e2b"
+
+    Unauthorized:
+      description: >-
+        Credentials are missing, invalid or expired. Which credentials are
+        expected depends on the operation (see `security`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WwwAuthenticate'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_credentials:
+              summary: No credentials supplied
+              value:
+                error:
+                  code: unauthenticated
+                  message: Authentication is required to access this resource.
+                  request_id: "req_7f3a9c1e2b"
+            invalid_credentials:
+              summary: Wrong API key or malformed token
+              value:
+                error:
+                  code: unauthenticated
+                  message: The supplied credentials are invalid.
+                  details:
+                    - location: header
+                      field: Authorization
+                      reason: malformed
+                      message: Bearer token could not be verified.
+                  request_id: "req_7f3a9c1e2b"
+            token_expired:
+              summary: Bearer token has expired
+              value:
+                error:
+                  code: token_expired
+                  message: The access token has expired. Log in again via POST /auth/telegram.
+                  request_id: "req_7f3a9c1e2b"
 
     Forbidden:
       description: >-
-        Credentials are valid, but do not grant access to this resource,
-        e.g. a Bearer token for user A used to access user B's data
-        (token's subject must match the {id} path parameter).
+        Credentials are valid, but the caller is not allowed to access this
+        resource — e.g. the token/Telegram ID belongs to user A while the path
+        addresses user B's data.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error: "Forbidden: token does not match requested user"
-
-    BadRequest:
-      description: The request body or query parameters are malformed or invalid.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error: "Invalid request body"
+          examples:
+            not_owner:
+              summary: Caller does not own the resource
+              value:
+                error:
+                  code: permission_denied
+                  message: The authenticated user cannot access another user's data.
+                  details:
+                    - location: path
+                      field: id
+                      reason: not_owner
+                      message: Path user id does not match the authenticated user.
+                  request_id: "req_7f3a9c1e2b"
 
     NotFound:
       description: The requested resource does not exist.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error: "Not found"
+          examples:
+            user_not_found:
+              summary: User not found
+              value:
+                error:
+                  code: not_found
+                  message: User not found.
+                  details:
+                    - location: path
+                      field: id
+                      reason: not_found
+                      message: User with id 42 does not exist.
+                  request_id: "req_7f3a9c1e2b"
+            cv_not_found:
+              summary: User has no CV
+              value:
+                error:
+                  code: not_found
+                  message: The user has not uploaded a CV yet.
+                  request_id: "req_7f3a9c1e2b"
+            vacancy_not_found:
+              summary: Vacancy or recommendation not found
+              value:
+                error:
+                  code: not_found
+                  message: Vacancy not found.
+                  details:
+                    - location: path
+                      field: vacancy_id
+                      reason: not_found
+                      message: Vacancy with id 101 does not exist.
+                  request_id: "req_7f3a9c1e2b"
 
     Conflict:
       description: >-
-        The request conflicts with the current state of the resource,
-        e.g. a duplicate (source, external_id) pair for vacancies,
-        or a duplicate telegram_id for users.
+        The request violates a uniqueness constraint: a duplicate
+        (source, external_id) pair for vacancies, or an already taken
+        `username` for users.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            username_taken:
+              summary: Username already belongs to another user
+              value:
+                error:
+                  code: conflict
+                  message: This username is already taken.
+                  details:
+                    - location: body
+                      field: username
+                      reason: already_exists
+                      message: username "johndoe" is used by another user.
+                  request_id: "req_7f3a9c1e2b"
+            vacancy_duplicate:
+              summary: Vacancy already ingested
+              value:
+                error:
+                  code: conflict
+                  message: A vacancy with this source and external_id already exists.
+                  details:
+                    - location: body
+                      field: external_id
+                      reason: already_exists
+                      message: HH.ru / 12345678 already exists.
+                  request_id: "req_7f3a9c1e2b"
+
+    PayloadTooLarge:
+      description: The uploaded file exceeds the size limit enforced by the server.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           example:
-            error: "Resource already exists"
+            error:
+              code: payload_too_large
+              message: The uploaded file is too large.
+              request_id: "req_7f3a9c1e2b"
+
+    UnsupportedMediaType:
+      description: The request content type or the uploaded file format is not supported.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: unsupported_media_type
+              message: Only PDF and DOCX files are supported.
+              details:
+                - location: body
+                  field: file
+                  reason: invalid_format
+                  message: Detected file type is image/png.
+              request_id: "req_7f3a9c1e2b"
 
     UnprocessableEntity:
       description: >-
-        The request is well-formed but fails semantic/business validation,
-        e.g. match_score outside the 0-100 range enforced by the DB CHECK
-        constraint, or an invalid enum value for grade/employment_type/language.
+        The request is well-formed but breaks a business rule, e.g. `match_score`
+        outside 0-100 (DB CHECK constraint) or an unknown enum value.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            score_out_of_range:
+              summary: match_score outside 0-100
+              value:
+                error:
+                  code: validation_failed
+                  message: The request failed validation.
+                  details:
+                    - location: body
+                      field: results.3.match_score
+                      reason: out_of_range
+                      message: match_score must be between 0 and 100
+                  request_id: "req_7f3a9c1e2b"
+            invalid_enum:
+              summary: Unknown enum value
+              value:
+                error:
+                  code: validation_failed
+                  message: The request failed validation.
+                  details:
+                    - location: body
+                      field: grade
+                      reason: invalid_enum
+                      message: "grade must be one of: INTERN, JUNIOR, MIDDLE, SENIOR, LEAD"
+                  request_id: "req_7f3a9c1e2b"
+
+    TooManyRequests:
+      description: Rate limit exceeded. Retry after the delay given in `Retry-After`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           example:
-            error: "match_score must be between 0 and 100"
+            error:
+              code: rate_limited
+              message: Too many requests. Please retry later.
+              request_id: "req_7f3a9c1e2b"
 
     InternalServerError:
-      description: An unexpected error occurred on the server.
+      description: >-
+        Unexpected server error. The body never contains internal details —
+        report the `request_id` to the backend team.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           example:
-            error: "Internal server error"
+            error:
+              code: internal_error
+              message: An unexpected error occurred. Please retry later.
+              request_id: "req_7f3a9c1e2b"
