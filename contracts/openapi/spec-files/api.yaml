@@ -1,0 +1,772 @@
+openapi: 3.0.3
+info:
+  title: Kiko API Contracts
+  version: 1.2.0
+  description: |-
+    Central REST API of the Kiko Core Backend (Go). One API, four kinds of clients,
+    each with its own credentials:
+
+    | Client | Credentials | Used for |
+    |---|---|---|
+    | Website (JS) | `BearerAuth` — JWT from `POST /auth/telegram` | the logged-in user's own data |
+    | Telegram bot (Python) | `BotApiKey` + `TelegramUserId` (`X-Telegram-Id`) | acting on behalf of a Telegram user |
+    | Vacancy parser | `ParserApiKey` | ingesting vacancies |
+    | AI matching worker | `AiWorkerApiKey` | `/internal/matching/*` |
+
+    **Ownership rule.** Every `/users/{id}/**` operation is owner-only: the user
+    resolved from the JWT `sub` (website) or from `X-Telegram-Id` (bot) must equal
+    `{id}`, otherwise the API answers `403 permission_denied`.
+
+    **Errors.** All errors share one envelope (`error.code`, `error.message`,
+    `error.details[]`, `error.request_id`) — see `errors.yaml`.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+# Default: owner-only access, either as the website user (JWT) or as the bot
+# acting for a Telegram user. Operations with different rules override this.
+security:
+  - BearerAuth: []
+  - BotApiKey: []
+    TelegramUserId: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Website. Access token (JWT, `sub` = users.id) obtained from
+        `POST /auth/telegram` after a Telegram Login Widget sign-in. When it
+        expires the API answers 401 `token_expired` and the user signs in again.
+    BotApiKey:
+      type: apiKey
+      in: header
+      name: X-Bot-Api-Key
+      description: >-
+        Telegram bot backend. Identifies the bot itself as a trusted service.
+        For user-scoped operations it MUST be sent together with
+        `X-Telegram-Id` (see TelegramUserId).
+    TelegramUserId:
+      type: apiKey
+      in: header
+      name: X-Telegram-Id
+      description: >-
+        Telegram ID of the user the bot is acting for. The server maps it to
+        users.id and applies the ownership rule. Never accepted on its own —
+        the header is trivially forgeable, so it only counts together with a
+        valid `X-Bot-Api-Key`.
+    ParserApiKey:
+      type: apiKey
+      in: header
+      name: X-Parser-Api-Key
+      description: Vacancy parser service. Grants access to vacancy ingestion only.
+    AiWorkerApiKey:
+      type: apiKey
+      in: header
+      name: X-Worker-Api-Key
+      description: >-
+        AI matching worker. Grants access to `/internal/matching/*` only.
+        Those routes should additionally be unreachable from the public network.
+
+tags:
+  - name: System
+    description: Health check
+  - name: Auth
+    description: Website sign-in via Telegram Login Widget
+  - name: Users
+    description: User profiles and lookups
+  - name: User Settings
+    description: Search preferences (owner-only)
+  - name: CV
+    description: User CV (owner-only)
+  - name: Vacancies
+    description: Public vacancy catalog and parser ingestion
+  - name: Recommendations
+    description: Personalized vacancies, scores and cover letters (owner-only)
+  - name: Internal AI
+    description: Endpoints for the AI matching worker
+
+paths:
+  # ==========================================
+  # SYSTEM
+  # ==========================================
+  /health:
+    get:
+      tags: [System]
+      operationId: healthCheck
+      summary: Health check
+      description: Returns the health of the backend and its database connection.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/HealthStatus'
+        '429':
+          $ref: './errors.yaml#/components/responses/TooManyRequests'
+
+  # ==========================================
+  # AUTH
+  # ==========================================
+  /auth/telegram:
+    post:
+      tags: [Auth]
+      operationId: authenticateWithTelegram
+      summary: Sign in with Telegram Login Widget (website)
+      description: >-
+        Exchanges Telegram Login Widget data for a Kiko access token. The server
+        MUST verify `hash` (HMAC-SHA256 of the data-check-string, keyed with the
+        SHA-256 of the bot token) and reject a stale `auth_date`. The user is
+        created on first sign-in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/TelegramLoginData'
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '409':
+          $ref: './errors.yaml#/components/responses/Conflict'
+        '429':
+          $ref: './errors.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  # ==========================================
+  # USERS
+  # ==========================================
+  /users:
+    post:
+      tags: [Users]
+      operationId: upsertUser
+      summary: Register or sync user (bot)
+      description: >-
+        Creates a user or returns the existing one (upsert on telegram_id).
+        Called by the bot on `/start`. The website does not use this — it
+        registers through `POST /auth/telegram`.
+      security:
+        - BotApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/CreateOrUpdateUserRequest'
+      responses:
+        '200':
+          description: Existing user returned or updated
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '409':
+          $ref: './errors.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './errors.yaml#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /users/lookup:
+    get:
+      tags: [Users]
+      operationId: lookupUser
+      summary: Find a user by Telegram ID or username (bot)
+      description: >-
+        Pass exactly one of `telegram_id` or `username` (400 otherwise).
+        `username` matching is case-insensitive; it is nullable in the DB but
+        unique among non-null values (migration 0006), so at most one user
+        matches. Bot-only: a username is public and guessable, so this endpoint
+        must not be open to end users.
+      security:
+        - BotApiKey: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/LookupTelegramId'
+        - $ref: './parameters.yaml#/components/parameters/LookupUsername'
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get user by ID
+      description: Owner-only.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+    patch:
+      tags: [Users]
+      operationId: patchUser
+      summary: Update user profile
+      description: Owner-only. Changing `username` to one already in use returns 409.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/PatchUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/User'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '409':
+          $ref: './errors.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './errors.yaml#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  # ==========================================
+  # USER SETTINGS
+  # ==========================================
+  /users/{id}/settings:
+    get:
+      tags: [User Settings]
+      operationId: getUserSettings
+      summary: Get user search settings
+      description: Owner-only.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Settings found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/UserSettings'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+    put:
+      tags: [User Settings]
+      operationId: upsertUserSettings
+      summary: Create or update user search settings
+      description: Owner-only.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/UpsertUserSettingsRequest'
+      responses:
+        '200':
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/UserSettings'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './errors.yaml#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  # ==========================================
+  # CV (RESUME)
+  # ==========================================
+  /users/{id}/cv:
+    get:
+      tags: [CV]
+      operationId: getUserCV
+      summary: Get CV metadata
+      description: >-
+        Owner-only. Returns metadata only; use `/cv/download` for the file itself.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '200':
+          description: CV found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/CV'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+    post:
+      tags: [CV]
+      operationId: upsertUserCV
+      summary: Attach or replace the CV
+      description: >-
+        Owner-only. Two ways in, both server-controlled — the client never
+        chooses a storage path:
+        the bot sends JSON with a Telegram `cv_file_id` (the server downloads
+        the file from Telegram), the website uploads the file as multipart.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/UpsertCVRequest'
+          multipart/form-data:
+            schema:
+              $ref: './models.yaml#/components/schemas/UploadCVRequest'
+            encoding:
+              file:
+                contentType: >-
+                  application/pdf,
+                  application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      responses:
+        '200':
+          description: CV saved
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/CV'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '413':
+          $ref: './errors.yaml#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: './errors.yaml#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+    delete:
+      tags: [CV]
+      operationId: deleteUserCV
+      summary: Delete the CV
+      description: Owner-only.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '204':
+          description: CV deleted
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /users/{id}/cv/download:
+    get:
+      tags: [CV]
+      operationId: downloadUserCV
+      summary: Download the CV file
+      description: >-
+        Owner-only. Streams the stored CV file (PDF/DOCX). This is the most
+        sensitive endpoint of the API (a raw personal document), so the
+        ownership check is mandatory.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+      responses:
+        '200':
+          description: CV file content
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  # ==========================================
+  # VACANCIES
+  # ==========================================
+  /vacancies:
+    get:
+      tags: [Vacancies]
+      operationId: listVacancies
+      summary: List catalog vacancies
+      description: Public read-only catalog; contains no user-specific data.
+      security: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/VacancySource'
+        - $ref: './parameters.yaml#/components/parameters/VacancyCompany'
+        - $ref: './parameters.yaml#/components/parameters/VacancyLocation'
+        - $ref: './parameters.yaml#/components/parameters/Limit'
+        - $ref: './parameters.yaml#/components/parameters/Offset'
+      responses:
+        '200':
+          description: A page of vacancies
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/VacancyPage'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '429':
+          $ref: './errors.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+    post:
+      tags: [Vacancies]
+      operationId: createVacancy
+      summary: Ingest a single vacancy (parser)
+      security:
+        - ParserApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/CreateVacancyRequest'
+      responses:
+        '201':
+          description: Vacancy ingested
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/Vacancy'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '409':
+          $ref: './errors.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './errors.yaml#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /vacancies/batch:
+    post:
+      tags: [Vacancies]
+      operationId: batchCreateVacancies
+      summary: Batch-ingest vacancies (parser)
+      description: >-
+        Preferred endpoint for parsers. Duplicates (by source + external_id)
+        are skipped silently and counted in `ignored`, so this never returns 409.
+      security:
+        - ParserApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/BatchCreateVacanciesRequest'
+      responses:
+        '200':
+          description: Batch ingestion result
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/BatchIngestVacanciesResponse'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '422':
+          $ref: './errors.yaml#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /vacancies/{id}:
+    get:
+      tags: [Vacancies]
+      operationId: getVacancy
+      summary: Get vacancy by ID
+      description: Public read-only; contains no user-specific data.
+      security: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/VacancyId'
+      responses:
+        '200':
+          description: Vacancy found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/Vacancy'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '429':
+          $ref: './errors.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  # ==========================================
+  # RECOMMENDATIONS (user_vacancies)
+  # ==========================================
+  /users/{id}/recommendations:
+    get:
+      tags: [Recommendations]
+      operationId: listUserRecommendations
+      summary: List personalized recommendations
+      description: Owner-only. Scored vacancies with match score and AI summary.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+        - $ref: './parameters.yaml#/components/parameters/MinScore'
+        - $ref: './parameters.yaml#/components/parameters/IsSeen'
+        - $ref: './parameters.yaml#/components/parameters/IsFavorite'
+        - $ref: './parameters.yaml#/components/parameters/Limit'
+        - $ref: './parameters.yaml#/components/parameters/Offset'
+      responses:
+        '200':
+          description: A page of recommendations
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/RecommendationPage'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /users/{id}/recommendations/{vacancy_id}:
+    get:
+      tags: [Recommendations]
+      operationId: getUserRecommendation
+      summary: Get one recommendation
+      description: Owner-only.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+        - $ref: './parameters.yaml#/components/parameters/RecommendationVacancyId'
+      responses:
+        '200':
+          description: Recommendation found
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/UserVacancyWithDetails'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+    patch:
+      tags: [Recommendations]
+      operationId: patchUserRecommendation
+      summary: Mark as seen / favorite
+      description: Owner-only.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+        - $ref: './parameters.yaml#/components/parameters/RecommendationVacancyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/PatchUserVacancyRequest'
+      responses:
+        '200':
+          description: Recommendation updated
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/UserVacancy'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /users/{id}/recommendations/{vacancy_id}/cover-letter:
+    post:
+      tags: [Recommendations]
+      operationId: generateCoverLetter
+      summary: Generate an AI cover letter
+      description: >-
+        Owner-only. Generates a cover letter from the user's profile, CV and the
+        vacancy, and stores it in user_vacancies.cover_letter. Expensive, hence
+        the rate limit.
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/UserId'
+        - $ref: './parameters.yaml#/components/parameters/RecommendationVacancyId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/GenerateCoverLetterRequest'
+      responses:
+        '200':
+          description: Cover letter generated
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/CoverLetterResponse'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './errors.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './errors.yaml#/components/responses/NotFound'
+        '429':
+          $ref: './errors.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  # ==========================================
+  # INTERNAL / AI WORKER
+  # ==========================================
+  /internal/matching/pending-tasks:
+    get:
+      tags: [Internal AI]
+      operationId: listPendingMatchingTasks
+      summary: Get unscored user–vacancy pairs
+      description: Users and freshly ingested vacancies waiting for AI analysis.
+      security:
+        - AiWorkerApiKey: []
+      parameters:
+        - $ref: './parameters.yaml#/components/parameters/PendingTasksLimit'
+      responses:
+        '200':
+          description: Pending matching tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './models.yaml#/components/schemas/MatchingTask'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
+
+  /internal/matching/results:
+    post:
+      tags: [Internal AI]
+      operationId: saveMatchingResults
+      summary: Save a batch of match results
+      description: The AI worker submits computed match scores and summaries.
+      security:
+        - AiWorkerApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/BatchSaveMatchResultsRequest'
+      responses:
+        '200':
+          description: Results saved
+          content:
+            application/json:
+              schema:
+                $ref: './models.yaml#/components/schemas/BatchSaveMatchResultsResponse'
+        '400':
+          $ref: './errors.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: './errors.yaml#/components/responses/Unauthorized'
+        '422':
+          $ref: './errors.yaml#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: './errors.yaml#/components/responses/InternalServerError'
