@@ -30,7 +30,9 @@ func StrWithinRange(s string, left, right int, utf bool) bool {
 	return sLen >= left && sLen <= right
 }
 
-func IntWithinRange()
+func IntWithinRange(val, left, right int) bool {
+	return val >= left && val <= right
+}
 
 func HashToken(token string) string {
 	hash := sha256.Sum256([]byte(token))
