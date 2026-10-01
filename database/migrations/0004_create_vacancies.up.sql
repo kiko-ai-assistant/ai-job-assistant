@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS vacancies (
     employment_type employment_type NOT NULL,
 
     location TEXT,
+    country TEXT,
+    city TEXT,
+
     description TEXT NOT NULL,
     url TEXT NOT NULL,
 
@@ -32,3 +35,5 @@ CREATE INDEX IF NOT EXISTS idx_vacancies_parsed_at ON vacancies(parsed_at);
 CREATE INDEX IF NOT EXISTS idx_vacancies_published_at ON vacancies(published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_vacancies_salary ON vacancies(currency, salary_from, salary_to);
 CREATE INDEX IF NOT EXISTS idx_vacancies_filters ON vacancies(employment_type, grade);
+
+CREATE INDEX IF NOT EXISTS idx_vacancies_city ON vacancies(city);

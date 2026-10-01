@@ -173,6 +173,8 @@ func RestoreSalary(text *string, from, to *int, currency *string) *Salary {
 	}
 }
 
+// ==================== Read-Only ====================
+
 func (s *Salary) Text() *string     { return s.text }
 func (s *Salary) From() *int        { return s.from }
 func (s *Salary) To() *int          { return s.to }
@@ -361,30 +363,6 @@ func (v *Vacancy) Source() VacancySource          { return v.source }
 func (v *Vacancy) Title() string                  { return v.title }
 func (v *Vacancy) Company() *string               { return v.company }
 func (v *Vacancy) Salary() *Salary                { return v.salary }
-func (v *Vacancy) SalaryText() *string {
-	if v.salary == nil {
-		return nil
-	}
-	return v.salary.Text()
-}
-func (v *Vacancy) SalaryFrom() *int {
-	if v.salary == nil {
-		return nil
-	}
-	return v.salary.From()
-}
-func (v *Vacancy) SalaryTo() *int {
-	if v.salary == nil {
-		return nil
-	}
-	return v.salary.To()
-}
-func (v *Vacancy) Currency() *string {
-	if v.salary == nil {
-		return nil
-	}
-	return v.salary.Currency()
-}
 func (v *Vacancy) Grade() Grade                   { return v.grade }
 func (v *Vacancy) EmploymentType() EmploymentType { return v.employmentType }
 func (v *Vacancy) Location() *string              { return v.location }
