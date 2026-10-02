@@ -225,11 +225,7 @@ func (s *Salary) Match(salary int, currency string) (bool, error) {
 		return *s.to >= salary, nil
 	}
 
-	if s.from != nil {
-		return *s.from >= salary, nil
-	}
-
-	return true, nil
+	return *s.from >= salary, nil
 }
 
 // ================ Location value object ================

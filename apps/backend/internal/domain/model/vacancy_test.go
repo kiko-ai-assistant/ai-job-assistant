@@ -100,6 +100,20 @@ func TestVacancySource_New(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name:        "valid mts lowercase",
+			raw:         "mts",
+			wantSource:  SourceMTS,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "valid mts uppercase and spaced",
+			raw:         "  MTS  ",
+			wantSource:  SourceMTS,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
 			name:        "empty raw",
 			raw:         "",
 			wantSource:  "",
@@ -1070,6 +1084,15 @@ func TestLocation_Match(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			name:        "location with city only and nil user city does not match",
+			loc:         RestoreLocation(nil, nil, pkgutils.VPtr(fakeValidTitle())),
+			country:     "Russia",
+			city:        nil,
+			wantMatch:   false,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
 			name:        "invalid country length returns error",
 			loc:         locRussiaMoscow,
 			country:     "R",
@@ -1142,6 +1165,7 @@ func TestVacancy_New_Success(t *testing.T) {
 		wantFromHH      bool
 		wantFromTG      bool
 		wantFromOzon    bool
+		wantFromMTS     bool
 	}{
 		{
 			name:            "full vacancy with all fields",
@@ -1166,6 +1190,7 @@ func TestVacancy_New_Success(t *testing.T) {
 			wantFromHH:      true,
 			wantFromTG:      false,
 			wantFromOzon:    false,
+			wantFromMTS:     false,
 		},
 		{
 			name:            "minimal vacancy with nil optional fields",
@@ -1190,6 +1215,7 @@ func TestVacancy_New_Success(t *testing.T) {
 			wantFromHH:      false,
 			wantFromTG:      true,
 			wantFromOzon:    false,
+			wantFromMTS:     false,
 		},
 		{
 			name:            "ozon vacancy",
@@ -1214,6 +1240,57 @@ func TestVacancy_New_Success(t *testing.T) {
 			wantFromHH:      false,
 			wantFromTG:      false,
 			wantFromOzon:    true,
+			wantFromMTS:     false,
+		},
+		{
+			name:            "mts vacancy",
+			extID:           gofakeit.UUID(),
+			source:          "mts",
+			title:           fakeValidTitle(),
+			company:         nil,
+			salary:          nil,
+			grade:           "intern",
+			eTypes:          []string{"remote"},
+			location:        nil,
+			desc:            fakeValidDescription(),
+			url:             fakeValidURL(),
+			pubAt:           pubAt,
+			parsedAt:        parsedAt,
+			wantSource:      SourceMTS,
+			wantGrade:       GradeIntern,
+			wantETypes:      []EmploymentType{EmploymentRemote},
+			wantHasCompany:  false,
+			wantHasSalary:   false,
+			wantHasLocation: false,
+			wantFromHH:      false,
+			wantFromTG:      false,
+			wantFromOzon:    false,
+			wantFromMTS:     true,
+		},
+		{
+			name:            "vacancy with spaces in string fields is trimmed",
+			extID:           "  " + gofakeit.UUID() + "  ",
+			source:          "mts",
+			title:           "  " + fakeValidTitle() + "  ",
+			company:         pkgutils.VPtr("  " + fakeValidCompany() + "  "),
+			salary:          nil,
+			grade:           "junior",
+			eTypes:          []string{"office"},
+			location:        nil,
+			desc:            "  " + fakeValidDescription() + "  ",
+			url:             "  " + fakeValidURL() + "  ",
+			pubAt:           pubAt,
+			parsedAt:        parsedAt,
+			wantSource:      SourceMTS,
+			wantGrade:       GradeJunior,
+			wantETypes:      []EmploymentType{EmploymentOffice},
+			wantHasCompany:  true,
+			wantHasSalary:   false,
+			wantHasLocation: false,
+			wantFromHH:      false,
+			wantFromTG:      false,
+			wantFromOzon:    false,
+			wantFromMTS:     true,
 		},
 	}
 
@@ -1227,22 +1304,23 @@ func TestVacancy_New_Success(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, v)
 			assert.NotEqual(t, uuid.Nil, v.ID())
-			assert.Equal(t, tt.extID, v.ExternalID())
+			assert.Equal(t, strings.TrimSpace(tt.extID), v.ExternalID())
 			assert.Equal(t, tt.wantSource, v.Source())
-			assert.Equal(t, tt.title, v.Title())
+			assert.Equal(t, strings.TrimSpace(tt.title), v.Title())
 			assert.Equal(t, tt.wantGrade, v.Grade())
 			assert.Equal(t, tt.wantETypes, v.EmploymentTypes())
-			assert.Equal(t, tt.desc, v.Description())
-			assert.Equal(t, tt.url, v.URL())
+			assert.Equal(t, strings.TrimSpace(tt.desc), v.Description())
+			assert.Equal(t, strings.TrimSpace(tt.url), v.URL())
 			assert.Equal(t, tt.pubAt, v.PublishedAt())
 			assert.Equal(t, tt.parsedAt, v.ParsedAt())
 
 			assert.Equal(t, tt.wantFromHH, v.FromHH())
 			assert.Equal(t, tt.wantFromTG, v.FromTelegram())
 			assert.Equal(t, tt.wantFromOzon, v.FromOzon())
+			assert.Equal(t, tt.wantFromMTS, v.FromMTS())
 
 			if tt.wantHasCompany {
-				assert.Equal(t, tt.company, v.Company())
+				assert.Equal(t, strings.TrimSpace(*tt.company), *v.Company())
 			} else {
 				assert.Nil(t, v.Company())
 			}
@@ -1686,6 +1764,64 @@ func TestVacancy_RestoreAndEncapsulation(t *testing.T) {
 				gotETypes[0] = EmploymentContract
 				assert.Equal(t, EmploymentRemote, v.EmploymentTypes()[0])
 			}
+		})
+	}
+}
+
+func TestVacancy_FromMethods(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name         string
+		source       VacancySource
+		wantFromHH   bool
+		wantFromTG   bool
+		wantFromOzon bool
+		wantFromMTS  bool
+	}{
+		{
+			name:         "hh vacancy",
+			source:       SourceHH,
+			wantFromHH:   true,
+			wantFromTG:   false,
+			wantFromOzon: false,
+			wantFromMTS:  false,
+		},
+		{
+			name:         "telegram vacancy",
+			source:       SourceTelegram,
+			wantFromHH:   false,
+			wantFromTG:   true,
+			wantFromOzon: false,
+			wantFromMTS:  false,
+		},
+		{
+			name:         "ozon vacancy",
+			source:       SourceOzon,
+			wantFromHH:   false,
+			wantFromTG:   false,
+			wantFromOzon: true,
+			wantFromMTS:  false,
+		},
+		{
+			name:         "mts vacancy",
+			source:       SourceMTS,
+			wantFromHH:   false,
+			wantFromTG:   false,
+			wantFromOzon: false,
+			wantFromMTS:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := RestoreVacancy(
+				uuid.New(), gofakeit.UUID(), tt.source, fakeValidTitle(), nil, nil,
+				GradeMiddle, nil, nil, fakeValidDescription(), fakeValidURL(), now, now,
+			)
+			assert.Equal(t, tt.wantFromHH, v.FromHH())
+			assert.Equal(t, tt.wantFromTG, v.FromTelegram())
+			assert.Equal(t, tt.wantFromOzon, v.FromOzon())
+			assert.Equal(t, tt.wantFromMTS, v.FromMTS())
 		})
 	}
 }
