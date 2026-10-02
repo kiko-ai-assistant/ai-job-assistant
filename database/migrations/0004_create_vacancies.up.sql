@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS vacancies (
     grade grade NOT NULL,  -- Intern/Junior/Senior and etc
     employment_type employment_type NOT NULL,
 
-    location TEXT,
+    location_text TEXT,
     country TEXT,
     city TEXT,
 

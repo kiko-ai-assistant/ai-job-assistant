@@ -16,6 +16,8 @@ var (
 	ErrSalaryRequiresCurrency = errors.New("currency is required when salary bounds are specified")
 	ErrCurrencyWithoutSalary  = errors.New("currency cannot be specified without salary bounds")
 	ErrInvalidSalaryRange     = errors.New("salary_from cannot be greater than salary_to")
+
+	ErrCityWithoutCountry = errors.New("city cannot be specified without country")
 )
 
 // ================ Vacancy source value object ================
@@ -180,6 +182,8 @@ func (s *Salary) From() *int        { return s.from }
 func (s *Salary) To() *int          { return s.to }
 func (s *Salary) Currency() *string { return s.currency }
 
+// ================ Business Logic ================
+
 func (s *Salary) Match(salary int, currency string) (bool, error) {
 	if salary < minSalaryVal || salary > maxSalaryVal {
 		return false, pkgerrs.NewValueInvalidError("salary")
@@ -207,6 +211,61 @@ func (s *Salary) Match(salary int, currency string) (bool, error) {
 	return true, nil
 }
 
+// ================ Location value object ================
+
+type Location struct {
+	text    *string
+	country *string
+	city    *string
+}
+
+func NewLocation(text, country, city *string) (*Location, error) {
+	if text == nil && country == nil && city == nil {
+		return nil, nil
+	}
+
+	if text != nil && !pkgtuils.StrWithinRange(*text, minLocTextLen, maxLocTextLen, true) {
+		return nil, pkgerrs.NewValueInvalidError("location_text")
+	}
+	if country != nil && !pkgtuils.StrWithinRange(*country, minLocCountryLen, maxLocCountryLen, true) {
+		return nil, pkgerrs.NewValueInvalidError("location_country")
+	}
+	if city != nil && !pkgtuils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
+		return nil, pkgerrs.NewValueInvalidError("location_city")
+	}
+
+	if country == nil && city != nil {
+		return nil, ErrCityWithoutCountry
+	}
+
+	return &Location{
+		text:    text,
+		country: country,
+		city:    city,
+	}, nil
+}
+
+func RestoreLocation(text, country, city *string) *Location {
+	return &Location{text: text, country: country, city: city}
+}
+
+// ==================== Read-Only ====================
+
+func (l *Location) Text() *string    { return l.text }
+func (l *Location) Country() *string { return l.country }
+func (l *Location) City() *string    { return l.city }
+
+// ================ Business Logic ================
+
+func (l *Location) Match(country, city *string) (bool, error) {
+	if country != nil && !pkgtuils.StrWithinRange(*country, minLocCountryLen, maxLocCountryLen, true) {
+		return false, pkgerrs.NewValueInvalidError("country")
+	}
+	if city != nil && !pkgtuils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
+		return false, pkgerrs.NewValueInvalidError("city")
+	}
+}
+
 // ================ Rich model of Vacancy ================
 
 const (
@@ -215,7 +274,9 @@ const (
 	minSalaryLen, maxSalaryLen           = 2, 150
 	minSalaryVal, maxSalaryVal           = 0, 100000000 // 10^8 (e.g. a billion)
 	minCurrencyLen, maxCurrencyLen       = 3, 3
-	minLocationLen, maxLocationLen       = 2, 80
+	minLocTextLen, maxLocTextLen         = 2, 80
+	minLocCountryLen, maxLocCountryLen   = 2, 40
+	minLocCityLen, maxLocCityLen         = 2, 50
 	minDescriptionLen, maxDescriptionLen = 300, 2500
 	minURLLen, maxURLLen                 = 10, 1024
 
@@ -282,7 +343,7 @@ func NewVacancy(
 		return nil, err
 	}
 
-	if location != nil && !pkgtuils.StrWithinRange(*location, minLocationLen, maxLocationLen, true) {
+	if location != nil && !pkgtuils.StrWithinRange(*location, minLocTextLen, maxLocTextLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("location")
 	}
 
