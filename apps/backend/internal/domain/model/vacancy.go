@@ -28,6 +28,7 @@ const (
 	SourceHH       VacancySource = "hh"
 	SourceTelegram VacancySource = "telegram"
 	SourceOzon     VacancySource = "ozon"
+	SourceMTS      VacancySource = "mts"
 )
 
 func NewVacancySource(raw string) (VacancySource, error) {
@@ -47,7 +48,8 @@ func NewVacancySource(raw string) (VacancySource, error) {
 func (s VacancySource) String() string { return string(s) }
 
 func (s VacancySource) IsValid() bool {
-	return s == SourceHH || s == SourceTelegram || s == SourceOzon
+	return s == SourceHH || s == SourceTelegram ||
+		s == SourceOzon || s == SourceMTS
 }
 
 // ================ Grade value object ================
@@ -376,7 +378,8 @@ func NewVacancy(
 	description, url string,
 	publishedAt, parsedAt time.Time,
 ) (*Vacancy, error) {
-	if len(strings.TrimSpace(externalID)) == 0 {
+	trimmedExtID := strings.TrimSpace(externalID)
+	if len(trimmedExtID) == 0 {
 		return nil, pkgerrs.NewValueRequiredError("external_id")
 	}
 
@@ -385,15 +388,20 @@ func NewVacancy(
 		return nil, err
 	}
 
-	if len(strings.TrimSpace(title)) == 0 {
+	trimmedTitle := strings.TrimSpace(title)
+	if len(trimmedTitle) == 0 {
 		return nil, pkgerrs.NewValueRequiredError("title")
 	}
-	if !pkgutils.StrWithinRange(title, minTitleLen, maxTitleLen, true) {
+	if !pkgutils.StrWithinRange(trimmedTitle, minTitleLen, maxTitleLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("title")
 	}
 
-	if company != nil && !pkgutils.StrWithinRange(*company, minCompanyLen, maxCompanyLen, true) {
-		return nil, pkgerrs.NewValueInvalidError("company")
+	var trimmedCompany *string
+	if company != nil {
+		if !pkgutils.StrWithinRange(*company, minCompanyLen, maxCompanyLen, true) {
+			return nil, pkgerrs.NewValueInvalidError("company")
+		}
+		trimmedCompany = pkgutils.VPtr(strings.TrimSpace(*company))
 	}
 
 	grade, err := NewGrade(rawGrade)
@@ -418,17 +426,19 @@ func NewVacancy(
 		}
 	}
 
-	if len(strings.TrimSpace(description)) == 0 {
+	trimmedDesc := strings.TrimSpace(description)
+	if len(trimmedDesc) == 0 {
 		return nil, pkgerrs.NewValueRequiredError("description")
 	}
-	if !pkgutils.StrWithinRange(description, minDescriptionLen, maxDescriptionLen, true) {
+	if !pkgutils.StrWithinRange(trimmedDesc, minDescriptionLen, maxDescriptionLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("description")
 	}
 
-	if len(strings.TrimSpace(url)) == 0 {
+	trimmedURL := strings.TrimSpace(url)
+	if len(trimmedURL) == 0 {
 		return nil, pkgerrs.NewValueRequiredError("url")
 	}
-	if !pkgutils.StrWithinRange(url, minURLLen, maxURLLen, true) {
+	if !pkgutils.StrWithinRange(trimmedURL, minURLLen, maxURLLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("url")
 	}
 
@@ -442,16 +452,16 @@ func NewVacancy(
 
 	return &Vacancy{
 		id:              uuid.New(),
-		externalID:      externalID,
+		externalID:      trimmedExtID,
 		source:          source,
-		title:           title,
-		company:         company,
+		title:           trimmedTitle,
+		company:         trimmedCompany,
 		salary:          salary,
 		grade:           grade,
 		employmentTypes: eTypes,
 		location:        location,
-		description:     description,
-		url:             url,
+		description:     trimmedDesc,
+		url:             trimmedURL,
 		publishedAt:     publishedAt,
 		parsedAt:        parsedAt,
 	}, nil
@@ -521,6 +531,7 @@ func (v *Vacancy) ParsedAt() time.Time    { return v.parsedAt }
 func (v *Vacancy) FromHH() bool       { return v.source == SourceHH }
 func (v *Vacancy) FromTelegram() bool { return v.source == SourceTelegram }
 func (v *Vacancy) FromOzon() bool     { return v.source == SourceOzon }
+func (v *Vacancy) FromMTS() bool      { return v.source == SourceMTS }
 
 func (v *Vacancy) IsExpired() bool {
 	return time.Since(v.publishedAt) > vacancyValidUpTo
