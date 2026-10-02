@@ -14,44 +14,44 @@ import (
 
 func fakeValidDescription() string {
 	desc := gofakeit.ProductDescription()
-	for len(desc) < 300 {
+	for len(desc) < minDescriptionLen {
 		desc += " " + gofakeit.ProductDescription()
 	}
-	if len(desc) > 2500 {
-		desc = desc[:2500]
+	if len(desc) > maxDescriptionLen {
+		desc = desc[:maxDescriptionLen]
 	}
 	return desc
 }
 
 func fakeValidTitle() string {
 	title := gofakeit.ProductName()
-	if len(title) < 3 {
+	if len(title) < minTitleLen {
 		title = title + " Job"
 	}
-	if len(title) > 100 {
-		title = title[:100]
+	if len(title) > maxTitleLen {
+		title = title[:maxTitleLen]
 	}
 	return title
 }
 
 func fakeValidCompany() string {
 	company := gofakeit.Company()
-	if len(company) < 2 {
+	if len(company) < minCompanyLen {
 		company = company + " Co"
 	}
-	if len(company) > 100 {
-		company = company[:100]
+	if len(company) > maxCompanyLen {
+		company = company[:maxCompanyLen]
 	}
 	return company
 }
 
 func fakeValidURL() string {
 	url := gofakeit.URL()
-	if len(url) < 10 {
+	if len(url) < minURLLen {
 		url = "https://example.com/" + url
 	}
-	if len(url) > 1024 {
-		url = url[:1024]
+	if len(url) > maxURLLen {
+		url = url[:maxURLLen]
 	}
 	return url
 }
@@ -975,6 +975,137 @@ func TestLocation_RestoreAndMethods(t *testing.T) {
 	assert.False(t, nilLoc.HasCity())
 }
 
+func TestLocation_Match(t *testing.T) {
+	locRussiaMoscow, err := NewLocation(pkgutils.VPtr(fakeValidTitle()), pkgutils.VPtr("Russia"), pkgutils.VPtr("Moscow"))
+	assert.NoError(t, err)
+
+	locRussiaKazan, err := NewLocation(pkgutils.VPtr(fakeValidTitle()), pkgutils.VPtr("Russia"), pkgutils.VPtr("Kazan"))
+	assert.NoError(t, err)
+
+	locUSASaintPetersburg, err := NewLocation(pkgutils.VPtr(fakeValidTitle()), pkgutils.VPtr("USA"), pkgutils.VPtr("Saint Petersburg"))
+	assert.NoError(t, err)
+
+	locRussiaNoCity, err := NewLocation(pkgutils.VPtr(fakeValidTitle()), pkgutils.VPtr("Russia"), nil)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		loc         *Location
+		country     string
+		city        *string
+		wantMatch   bool
+		wantErr     bool
+		expectedErr error
+	}{
+		{
+			name:        "nil location receiver matches any country and city",
+			loc:         nil,
+			country:     "Russia",
+			city:        pkgutils.VPtr("Moscow"),
+			wantMatch:   true,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "same country and same city matches",
+			loc:         locRussiaMoscow,
+			country:     "Russia",
+			city:        pkgutils.VPtr("Moscow"),
+			wantMatch:   true,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "case insensitive match matches",
+			loc:         locRussiaMoscow,
+			country:     "russia",
+			city:        pkgutils.VPtr("moscow"),
+			wantMatch:   true,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "same city name but different country does not match",
+			loc:         locUSASaintPetersburg,
+			country:     "Russia",
+			city:        pkgutils.VPtr("Saint Petersburg"),
+			wantMatch:   false,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "same country but different city does not match",
+			loc:         locRussiaKazan,
+			country:     "Russia",
+			city:        pkgutils.VPtr("Moscow"),
+			wantMatch:   false,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "country matches and city is nil matches",
+			loc:         locRussiaKazan,
+			country:     "Russia",
+			city:        nil,
+			wantMatch:   true,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "country does not match",
+			loc:         locRussiaKazan,
+			country:     "Germany",
+			city:        nil,
+			wantMatch:   false,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "city requested but vacancy has no city does not match",
+			loc:         locRussiaNoCity,
+			country:     "Russia",
+			city:        pkgutils.VPtr("Moscow"),
+			wantMatch:   false,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "invalid country length returns error",
+			loc:         locRussiaMoscow,
+			country:     "R",
+			city:        nil,
+			wantMatch:   false,
+			wantErr:     true,
+			expectedErr: pkgerrs.NewValueInvalidError("country"),
+		},
+		{
+			name:        "invalid city length returns error",
+			loc:         locRussiaMoscow,
+			country:     "Russia",
+			city:        pkgutils.VPtr("M"),
+			wantMatch:   false,
+			wantErr:     true,
+			expectedErr: pkgerrs.NewValueInvalidError("city"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotMatch, err := tt.loc.Match(tt.country, tt.city)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.False(t, gotMatch)
+				if tt.expectedErr != nil {
+					assert.Equal(t, tt.expectedErr, err)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantMatch, gotMatch)
+			}
+		})
+	}
+}
+
 func TestVacancy_New_Success(t *testing.T) {
 	now := time.Now()
 	pubAt := now.Add(-2 * time.Hour)
@@ -1781,6 +1912,114 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.wantMatch, got)
+			}
+		})
+	}
+}
+
+func TestVacancy_MatchByLocation(t *testing.T) {
+	loc, err := NewLocation(pkgutils.VPtr(fakeValidTitle()), pkgutils.VPtr("Russia"), pkgutils.VPtr("Moscow"))
+	assert.NoError(t, err)
+
+	now := time.Now()
+	vacWithLoc := RestoreVacancy(
+		uuid.New(), gofakeit.UUID(), SourceHH, fakeValidTitle(), nil, nil,
+		GradeMiddle, []EmploymentType{EmploymentRemote}, loc, fakeValidDescription(),
+		fakeValidURL(), now, now,
+	)
+
+	vacWithoutLoc := RestoreVacancy(
+		uuid.New(), gofakeit.UUID(), SourceHH, fakeValidTitle(), nil, nil,
+		GradeMiddle, []EmploymentType{EmploymentRemote}, nil, fakeValidDescription(),
+		fakeValidURL(), now, now,
+	)
+
+	tests := []struct {
+		name        string
+		vac         *Vacancy
+		userCountry *string
+		userCity    *string
+		wantMatch   bool
+		wantErr     bool
+		expectedErr error
+	}{
+		{
+			name:        "nil location on vacancy matches any location filter",
+			vac:         vacWithoutLoc,
+			userCountry: pkgutils.VPtr("Russia"),
+			userCity:    pkgutils.VPtr("Moscow"),
+			wantMatch:   true,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "nil user filter on vacancy with location matches",
+			vac:         vacWithLoc,
+			userCountry: nil,
+			userCity:    nil,
+			wantMatch:   true,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "matching country and city matches",
+			vac:         vacWithLoc,
+			userCountry: pkgutils.VPtr("Russia"),
+			userCity:    pkgutils.VPtr("Moscow"),
+			wantMatch:   true,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "different city does not match",
+			vac:         vacWithLoc,
+			userCountry: pkgutils.VPtr("Russia"),
+			userCity:    pkgutils.VPtr("Kazan"),
+			wantMatch:   false,
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name:        "city without country returns ErrCityWithoutCountry",
+			vac:         vacWithLoc,
+			userCountry: nil,
+			userCity:    pkgutils.VPtr("Moscow"),
+			wantMatch:   false,
+			wantErr:     true,
+			expectedErr: ErrCityWithoutCountry,
+		},
+		{
+			name:        "invalid country length returns error",
+			vac:         vacWithLoc,
+			userCountry: pkgutils.VPtr("R"),
+			userCity:    nil,
+			wantMatch:   false,
+			wantErr:     true,
+			expectedErr: pkgerrs.NewValueInvalidError("country"),
+		},
+		{
+			name:        "invalid city length returns error",
+			vac:         vacWithLoc,
+			userCountry: pkgutils.VPtr("Russia"),
+			userCity:    pkgutils.VPtr("M"),
+			wantMatch:   false,
+			wantErr:     true,
+			expectedErr: pkgerrs.NewValueInvalidError("city"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotMatch, err := tt.vac.MatchByLocation(tt.userCountry, tt.userCity)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.False(t, gotMatch)
+				if tt.expectedErr != nil {
+					assert.Equal(t, tt.expectedErr, err)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantMatch, gotMatch)
 			}
 		})
 	}

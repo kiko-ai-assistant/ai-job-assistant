@@ -158,11 +158,19 @@ func NewSalary(text *string, from, to *int, currency *string) (*Salary, error) {
 		return nil, pkgerrs.NewValueInvalidError("currency")
 	}
 
+	var trimmedText, trimmedCurrency *string
+	if text != nil {
+		trimmedText = pkgutils.VPtr(strings.TrimSpace(*text))
+	}
+	if currency != nil {
+		trimmedCurrency = pkgutils.VPtr(strings.TrimSpace(*currency))
+	}
+
 	return &Salary{
-		text:     text,
+		text:     trimmedText,
 		from:     from,
 		to:       to,
-		currency: currency,
+		currency: trimmedCurrency,
 	}, nil
 }
 
@@ -249,10 +257,21 @@ func NewLocation(text, country, city *string) (*Location, error) {
 		return nil, ErrCityWithoutCountry
 	}
 
+	var trimmedText, trimmedCountry, trimmedCity *string
+	if text != nil {
+		trimmedText = pkgutils.VPtr(strings.TrimSpace(*text))
+	}
+	if country != nil {
+		trimmedCountry = pkgutils.VPtr(strings.TrimSpace(*country))
+	}
+	if city != nil {
+		trimmedCity = pkgutils.VPtr(strings.TrimSpace(*city))
+	}
+
 	return &Location{
-		text:    text,
-		country: country,
-		city:    city,
+		text:    trimmedText,
+		country: trimmedCountry,
+		city:    trimmedCity,
 	}, nil
 }
 
