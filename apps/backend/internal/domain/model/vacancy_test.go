@@ -519,26 +519,69 @@ func TestSalary_New(t *testing.T) {
 }
 
 func TestSalary_RestoreAndMethods(t *testing.T) {
-	assert.Nil(t, RestoreSalary(nil, nil, nil, nil))
-
 	text := pkgutils.VPtr(gofakeit.ProductName())
 	from := pkgutils.VPtr(gofakeit.Number(10000, 50000))
 	to := pkgutils.VPtr(*from + gofakeit.Number(5000, 20000))
 	currency := pkgutils.VPtr("USD")
 
-	s := RestoreSalary(text, from, to, currency)
-	assert.NotNil(t, s)
-	assert.Equal(t, text, s.Text())
-	assert.Equal(t, from, s.From())
-	assert.Equal(t, to, s.To())
-	assert.Equal(t, currency, s.Currency())
-	assert.True(t, s.HasBounds())
-	assert.False(t, s.IsNegotiable())
+	tests := []struct {
+		name           string
+		text           *string
+		from           *int
+		to             *int
+		currency       *string
+		wantNil        bool
+		wantHasBounds  bool
+		wantNegotiable bool
+	}{
+		{
+			name:           "all nil returns nil",
+			text:           nil,
+			from:           nil,
+			to:             nil,
+			currency:       nil,
+			wantNil:        true,
+			wantHasBounds:  false,
+			wantNegotiable: false,
+		},
+		{
+			name:           "salary with bounds",
+			text:           text,
+			from:           from,
+			to:             to,
+			currency:       currency,
+			wantNil:        false,
+			wantHasBounds:  true,
+			wantNegotiable: false,
+		},
+		{
+			name:           "negotiable salary without bounds",
+			text:           text,
+			from:           nil,
+			to:             nil,
+			currency:       nil,
+			wantNil:        false,
+			wantHasBounds:  false,
+			wantNegotiable: true,
+		},
+	}
 
-	negotiable := RestoreSalary(text, nil, nil, nil)
-	assert.NotNil(t, negotiable)
-	assert.False(t, negotiable.HasBounds())
-	assert.True(t, negotiable.IsNegotiable())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := RestoreSalary(tt.text, tt.from, tt.to, tt.currency)
+			if tt.wantNil {
+				assert.Nil(t, s)
+			} else {
+				assert.NotNil(t, s)
+				assert.Equal(t, tt.text, s.Text())
+				assert.Equal(t, tt.from, s.From())
+				assert.Equal(t, tt.to, s.To())
+				assert.Equal(t, tt.currency, s.Currency())
+				assert.Equal(t, tt.wantHasBounds, s.HasBounds())
+				assert.Equal(t, tt.wantNegotiable, s.IsNegotiable())
+			}
+		})
+	}
 
 	var nilSalary *Salary
 	assert.False(t, nilSalary.HasBounds())
@@ -869,36 +912,70 @@ func TestLocation_New(t *testing.T) {
 }
 
 func TestLocation_RestoreAndMethods(t *testing.T) {
-	assert.Nil(t, RestoreLocation(nil, nil, nil))
-
 	text := pkgutils.VPtr(gofakeit.ProductName())
 	country := pkgutils.VPtr("Germany")
 	city := pkgutils.VPtr("Berlin")
 
-	loc := RestoreLocation(text, country, city)
-	assert.NotNil(t, loc)
-	assert.Equal(t, text, loc.Text())
-	assert.Equal(t, country, loc.Country())
-	assert.Equal(t, city, loc.City())
-	assert.True(t, loc.HasCountry())
-	assert.True(t, loc.HasCity())
+	tests := []struct {
+		name           string
+		text           *string
+		country        *string
+		city           *string
+		wantNil        bool
+		wantHasCountry bool
+		wantHasCity    bool
+	}{
+		{
+			name:           "all nil returns nil",
+			text:           nil,
+			country:        nil,
+			city:           nil,
+			wantNil:        true,
+			wantHasCountry: false,
+			wantHasCity:    false,
+		},
+		{
+			name:           "location with country and city",
+			text:           text,
+			country:        country,
+			city:           city,
+			wantNil:        false,
+			wantHasCountry: true,
+			wantHasCity:    true,
+		},
+		{
+			name:           "location with country only",
+			text:           text,
+			country:        country,
+			city:           nil,
+			wantNil:        false,
+			wantHasCountry: true,
+			wantHasCity:    false,
+		},
+	}
 
-	locNoCity := RestoreLocation(text, country, nil)
-	assert.NotNil(t, locNoCity)
-	assert.True(t, locNoCity.HasCountry())
-	assert.False(t, locNoCity.HasCity())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loc := RestoreLocation(tt.text, tt.country, tt.city)
+			if tt.wantNil {
+				assert.Nil(t, loc)
+			} else {
+				assert.NotNil(t, loc)
+				assert.Equal(t, tt.text, loc.Text())
+				assert.Equal(t, tt.country, loc.Country())
+				assert.Equal(t, tt.city, loc.City())
+				assert.Equal(t, tt.wantHasCountry, loc.HasCountry())
+				assert.Equal(t, tt.wantHasCity, loc.HasCity())
+			}
+		})
+	}
 
 	var nilLoc *Location
 	assert.False(t, nilLoc.HasCountry())
 	assert.False(t, nilLoc.HasCity())
 }
 
-func TestVacancy_New_HappyPath(t *testing.T) {
-	extID := gofakeit.UUID()
-	title := fakeValidTitle()
-	company := fakeValidCompany()
-	desc := fakeValidDescription()
-	url := fakeValidURL()
+func TestVacancy_New_Success(t *testing.T) {
 	now := time.Now()
 	pubAt := now.Add(-2 * time.Hour)
 	parsedAt := now.Add(-1 * time.Hour)
@@ -909,76 +986,149 @@ func TestVacancy_New_HappyPath(t *testing.T) {
 	loc, err := NewLocation(pkgutils.VPtr(fakeValidTitle()), pkgutils.VPtr("Russia"), pkgutils.VPtr("Moscow"))
 	assert.NoError(t, err)
 
-	v, err := NewVacancy(
-		extID, "hh", title, pkgutils.VPtr(company), salary,
-		"middle", []string{"remote", "office", "remote"}, loc,
-		desc, url, pubAt, parsedAt,
-	)
+	company := fakeValidCompany()
 
-	assert.NoError(t, err)
-	assert.NotNil(t, v)
-	assert.NotEqual(t, uuid.Nil, v.ID())
-	assert.Equal(t, extID, v.ExternalID())
-	assert.Equal(t, SourceHH, v.Source())
-	assert.Equal(t, title, v.Title())
-	assert.Equal(t, pkgutils.VPtr(company), v.Company())
-	assert.Equal(t, salary, v.Salary())
-	assert.Equal(t, GradeMiddle, v.Grade())
-	assert.Equal(t, []EmploymentType{EmploymentRemote, EmploymentOffice}, v.EmploymentTypes())
-	assert.Equal(t, loc, v.Location())
-	assert.Equal(t, desc, v.Description())
-	assert.Equal(t, url, v.URL())
-	assert.Equal(t, pubAt, v.PublishedAt())
-	assert.Equal(t, parsedAt, v.ParsedAt())
+	tests := []struct {
+		name            string
+		extID           string
+		source          string
+		title           string
+		company         *string
+		salary          *Salary
+		grade           string
+		eTypes          []string
+		location        *Location
+		desc            string
+		url             string
+		pubAt           time.Time
+		parsedAt        time.Time
+		wantSource      VacancySource
+		wantGrade       Grade
+		wantETypes      []EmploymentType
+		wantHasCompany  bool
+		wantHasSalary   bool
+		wantHasLocation bool
+		wantFromHH      bool
+		wantFromTG      bool
+		wantFromOzon    bool
+	}{
+		{
+			name:            "full vacancy with all fields",
+			extID:           gofakeit.UUID(),
+			source:          "hh",
+			title:           fakeValidTitle(),
+			company:         pkgutils.VPtr(company),
+			salary:          salary,
+			grade:           "middle",
+			eTypes:          []string{"remote", "office", "remote"},
+			location:        loc,
+			desc:            fakeValidDescription(),
+			url:             fakeValidURL(),
+			pubAt:           pubAt,
+			parsedAt:        parsedAt,
+			wantSource:      SourceHH,
+			wantGrade:       GradeMiddle,
+			wantETypes:      []EmploymentType{EmploymentRemote, EmploymentOffice},
+			wantHasCompany:  true,
+			wantHasSalary:   true,
+			wantHasLocation: true,
+			wantFromHH:      true,
+			wantFromTG:      false,
+			wantFromOzon:    false,
+		},
+		{
+			name:            "minimal vacancy with nil optional fields",
+			extID:           gofakeit.UUID(),
+			source:          "telegram",
+			title:           fakeValidTitle(),
+			company:         nil,
+			salary:          nil,
+			grade:           "senior",
+			eTypes:          []string{"hybrid"},
+			location:        nil,
+			desc:            fakeValidDescription(),
+			url:             fakeValidURL(),
+			pubAt:           now.Add(-10 * time.Minute),
+			parsedAt:        now.Add(-5 * time.Minute),
+			wantSource:      SourceTelegram,
+			wantGrade:       GradeSenior,
+			wantETypes:      []EmploymentType{EmploymentHybrid},
+			wantHasCompany:  false,
+			wantHasSalary:   false,
+			wantHasLocation: false,
+			wantFromHH:      false,
+			wantFromTG:      true,
+			wantFromOzon:    false,
+		},
+		{
+			name:            "ozon vacancy",
+			extID:           gofakeit.UUID(),
+			source:          "ozon",
+			title:           fakeValidTitle(),
+			company:         nil,
+			salary:          nil,
+			grade:           "lead",
+			eTypes:          []string{"contract"},
+			location:        nil,
+			desc:            fakeValidDescription(),
+			url:             fakeValidURL(),
+			pubAt:           pubAt,
+			parsedAt:        parsedAt,
+			wantSource:      SourceOzon,
+			wantGrade:       GradeLead,
+			wantETypes:      []EmploymentType{EmploymentContract},
+			wantHasCompany:  false,
+			wantHasSalary:   false,
+			wantHasLocation: false,
+			wantFromHH:      false,
+			wantFromTG:      false,
+			wantFromOzon:    true,
+		},
+	}
 
-	assert.Equal(t, 100000, *v.SalaryFrom())
-	assert.Equal(t, 150000, *v.SalaryTo())
-	assert.Equal(t, "RUB", *v.SalaryCurrency())
-	assert.Nil(t, v.SalaryText())
-	assert.Equal(t, "Russia", *v.LocationCountry())
-	assert.Equal(t, "Moscow", *v.LocationCity())
-	assert.True(t, v.HasSalary())
-	assert.True(t, v.HasLocation())
-	assert.True(t, v.HasCompany())
-	assert.True(t, v.HasEmploymentType(EmploymentRemote))
-	assert.True(t, v.HasEmploymentType(EmploymentOffice))
-	assert.False(t, v.HasEmploymentType(EmploymentHybrid))
-	assert.True(t, v.FromHH())
-	assert.False(t, v.FromTelegram())
-	assert.False(t, v.FromOzon())
-	assert.True(t, v.IsFrom(SourceHH))
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v, err := NewVacancy(
+				tt.extID, tt.source, tt.title, tt.company, tt.salary,
+				tt.grade, tt.eTypes, tt.location,
+				tt.desc, tt.url, tt.pubAt, tt.parsedAt,
+			)
+			assert.NoError(t, err)
+			assert.NotNil(t, v)
+			assert.NotEqual(t, uuid.Nil, v.ID())
+			assert.Equal(t, tt.extID, v.ExternalID())
+			assert.Equal(t, tt.wantSource, v.Source())
+			assert.Equal(t, tt.title, v.Title())
+			assert.Equal(t, tt.wantGrade, v.Grade())
+			assert.Equal(t, tt.wantETypes, v.EmploymentTypes())
+			assert.Equal(t, tt.desc, v.Description())
+			assert.Equal(t, tt.url, v.URL())
+			assert.Equal(t, tt.pubAt, v.PublishedAt())
+			assert.Equal(t, tt.parsedAt, v.ParsedAt())
 
-func TestVacancy_New_Minimal(t *testing.T) {
-	extID := gofakeit.UUID()
-	title := fakeValidTitle()
-	desc := fakeValidDescription()
-	url := fakeValidURL()
-	now := time.Now()
-	pubAt := now.Add(-10 * time.Minute)
-	parsedAt := now.Add(-5 * time.Minute)
+			assert.Equal(t, tt.wantFromHH, v.FromHH())
+			assert.Equal(t, tt.wantFromTG, v.FromTelegram())
+			assert.Equal(t, tt.wantFromOzon, v.FromOzon())
 
-	v, err := NewVacancy(
-		extID, "telegram", title, nil, nil,
-		"senior", []string{"hybrid"}, nil,
-		desc, url, pubAt, parsedAt,
-	)
+			if tt.wantHasCompany {
+				assert.Equal(t, tt.company, v.Company())
+			} else {
+				assert.Nil(t, v.Company())
+			}
 
-	assert.NoError(t, err)
-	assert.NotNil(t, v)
-	assert.Nil(t, v.Company())
-	assert.Nil(t, v.Salary())
-	assert.Nil(t, v.Location())
-	assert.Nil(t, v.SalaryFrom())
-	assert.Nil(t, v.SalaryTo())
-	assert.Nil(t, v.SalaryCurrency())
-	assert.Nil(t, v.SalaryText())
-	assert.Nil(t, v.LocationCountry())
-	assert.Nil(t, v.LocationCity())
-	assert.False(t, v.HasSalary())
-	assert.False(t, v.HasLocation())
-	assert.False(t, v.HasCompany())
-	assert.True(t, v.FromTelegram())
+			if tt.wantHasSalary {
+				assert.Equal(t, tt.salary, v.Salary())
+			} else {
+				assert.Nil(t, v.Salary())
+			}
+
+			if tt.wantHasLocation {
+				assert.Equal(t, tt.location, v.Location())
+			} else {
+				assert.Nil(t, v.Location())
+			}
+		})
+	}
 }
 
 func TestVacancy_New_ValidationErrors(t *testing.T) {
@@ -1355,38 +1505,58 @@ func TestVacancy_RestoreAndEncapsulation(t *testing.T) {
 
 	salary := RestoreSalary(nil, pkgutils.VPtr(80000), pkgutils.VPtr(120000), pkgutils.VPtr("USD"))
 	loc := RestoreLocation(pkgutils.VPtr(fakeValidTitle()), pkgutils.VPtr("USA"), pkgutils.VPtr("New York"))
-	originalETypes := []EmploymentType{EmploymentRemote, EmploymentOffice}
 
-	v := RestoreVacancy(
-		id, extID, SourceOzon, title, pkgutils.VPtr(company), salary,
-		GradeSenior, originalETypes, loc,
-		desc, url, pubAt, parsedAt,
-	)
+	tests := []struct {
+		name       string
+		eTypes     []EmploymentType
+		wantETypes []EmploymentType
+	}{
+		{
+			name:       "nil employment types restored as nil",
+			eTypes:     nil,
+			wantETypes: nil,
+		},
+		{
+			name:       "non-nil employment types restored and copied",
+			eTypes:     []EmploymentType{EmploymentRemote, EmploymentOffice},
+			wantETypes: []EmploymentType{EmploymentRemote, EmploymentOffice},
+		},
+	}
 
-	assert.NotNil(t, v)
-	assert.Equal(t, id, v.ID())
-	assert.Equal(t, extID, v.ExternalID())
-	assert.Equal(t, SourceOzon, v.Source())
-	assert.Equal(t, title, v.Title())
-	assert.Equal(t, pkgutils.VPtr(company), v.Company())
-	assert.Equal(t, salary, v.Salary())
-	assert.Equal(t, GradeSenior, v.Grade())
-	assert.Equal(t, originalETypes, v.EmploymentTypes())
-	assert.Equal(t, loc, v.Location())
-	assert.Equal(t, desc, v.Description())
-	assert.Equal(t, url, v.URL())
-	assert.Equal(t, pubAt, v.PublishedAt())
-	assert.Equal(t, parsedAt, v.ParsedAt())
-	assert.True(t, v.FromOzon())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := RestoreVacancy(
+				id, extID, SourceOzon, title, pkgutils.VPtr(company), salary,
+				GradeSenior, tt.eTypes, loc,
+				desc, url, pubAt, parsedAt,
+			)
 
-	originalETypes[0] = EmploymentContract
-	assert.Equal(t, EmploymentRemote, v.EmploymentTypes()[0])
+			assert.NotNil(t, v)
+			assert.Equal(t, id, v.ID())
+			assert.Equal(t, extID, v.ExternalID())
+			assert.Equal(t, SourceOzon, v.Source())
+			assert.Equal(t, title, v.Title())
+			assert.Equal(t, pkgutils.VPtr(company), v.Company())
+			assert.Equal(t, salary, v.Salary())
+			assert.Equal(t, GradeSenior, v.Grade())
+			assert.Equal(t, tt.wantETypes, v.EmploymentTypes())
+			assert.Equal(t, loc, v.Location())
+			assert.Equal(t, desc, v.Description())
+			assert.Equal(t, url, v.URL())
+			assert.Equal(t, pubAt, v.PublishedAt())
+			assert.Equal(t, parsedAt, v.ParsedAt())
+			assert.True(t, v.FromOzon())
 
-	gotETypes := v.EmploymentTypes()
-	gotETypes[0] = EmploymentContract
-	assert.Equal(t, EmploymentRemote, v.EmploymentTypes()[0])
+			if len(tt.eTypes) > 0 {
+				tt.eTypes[0] = EmploymentContract
+				assert.Equal(t, EmploymentRemote, v.EmploymentTypes()[0])
 
-	assert.Nil(t, RestoreVacancy(id, extID, SourceOzon, title, nil, nil, GradeSenior, nil, nil, desc, url, pubAt, parsedAt).EmploymentTypes())
+				gotETypes := v.EmploymentTypes()
+				gotETypes[0] = EmploymentContract
+				assert.Equal(t, EmploymentRemote, v.EmploymentTypes()[0])
+			}
+		})
+	}
 }
 
 func TestVacancy_BusinessLogic(t *testing.T) {
@@ -1404,12 +1574,54 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	assert.True(t, v.IsPublishedAfter(now.Add(-3*time.Hour)))
-	assert.False(t, v.IsPublishedAfter(now.Add(-1*time.Hour)))
+	publishTimeTests := []struct {
+		name      string
+		checkTime time.Time
+		wantAfter bool
+	}{
+		{
+			name:      "published after 3 hours ago",
+			checkTime: now.Add(-3 * time.Hour),
+			wantAfter: true,
+		},
+		{
+			name:      "not published after 1 hour ago",
+			checkTime: now.Add(-1 * time.Hour),
+			wantAfter: false,
+		},
+	}
+	for _, tt := range publishTimeTests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.wantAfter, v.IsPublishedAfter(tt.checkTime))
+		})
+	}
 
-	assert.False(t, v.IsExpired())
-	assert.False(t, v.IsExpiredAt(now))
-	assert.True(t, v.IsExpiredAt(pubAt.Add(8*24*time.Hour)))
+	expiredTests := []struct {
+		name        string
+		publishedAt time.Time
+		wantExpired bool
+	}{
+		{
+			name:        "recent vacancy is not expired",
+			publishedAt: pubAt,
+			wantExpired: false,
+		},
+		{
+			name:        "vacancy older than 7 days is expired",
+			publishedAt: now.Add(-8 * 24 * time.Hour),
+			wantExpired: true,
+		},
+	}
+	for _, tt := range expiredTests {
+		t.Run(tt.name, func(t *testing.T) {
+			targetVac := RestoreVacancy(
+				uuid.New(), gofakeit.UUID(), SourceHH, fakeValidTitle(), nil, nil,
+				GradeMiddle, []EmploymentType{EmploymentRemote}, nil,
+				fakeValidDescription(), fakeValidURL(), tt.publishedAt, now,
+			)
+			assert.Equal(t, tt.wantExpired, targetVac.IsExpired())
+		})
+	}
 
 	matchGradeTests := []struct {
 		name      string
@@ -1417,18 +1629,8 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 		wantMatch bool
 	}{
 		{
-			name:      "empty grade matches any",
-			grade:     "",
-			wantMatch: true,
-		},
-		{
 			name:      "same grade matches",
 			grade:     GradeMiddle,
-			wantMatch: true,
-		},
-		{
-			name:      "same grade uppercase matches",
-			grade:     "MIDDLE",
 			wantMatch: true,
 		},
 		{
@@ -1464,8 +1666,8 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 			wantMatch: true,
 		},
 		{
-			name:      "uppercase matching type matches",
-			eTypes:    []EmploymentType{"HYBRID"},
+			name:      "matching hybrid type matches",
+			eTypes:    []EmploymentType{EmploymentHybrid},
 			wantMatch: true,
 		},
 		{
@@ -1480,8 +1682,16 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 		})
 	}
 
+	vacNoSalary, err := NewVacancy(
+		gofakeit.UUID(), "hh", fakeValidTitle(), nil, nil,
+		"lead", []string{"remote"}, nil,
+		fakeValidDescription(), fakeValidURL(), pubAt, parsedAt,
+	)
+	assert.NoError(t, err)
+
 	matchSalaryTests := []struct {
 		name        string
+		targetVac   *Vacancy
 		salary      *int
 		currency    *string
 		wantMatch   bool
@@ -1490,6 +1700,7 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 	}{
 		{
 			name:        "nil salary and nil currency matches",
+			targetVac:   v,
 			salary:      nil,
 			currency:    nil,
 			wantMatch:   true,
@@ -1498,6 +1709,7 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 		},
 		{
 			name:        "nil salary with currency returns ErrCurrencyWithoutSalary",
+			targetVac:   v,
 			salary:      nil,
 			currency:    pkgutils.VPtr("RUB"),
 			wantMatch:   false,
@@ -1506,6 +1718,7 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 		},
 		{
 			name:        "salary without currency returns ErrSalaryRequiresCurrency",
+			targetVac:   v,
 			salary:      pkgutils.VPtr(120000),
 			currency:    nil,
 			wantMatch:   false,
@@ -1514,6 +1727,7 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 		},
 		{
 			name:        "invalid salary range",
+			targetVac:   v,
 			salary:      pkgutils.VPtr(-10),
 			currency:    pkgutils.VPtr("RUB"),
 			wantMatch:   false,
@@ -1522,6 +1736,7 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 		},
 		{
 			name:        "invalid currency length",
+			targetVac:   v,
 			salary:      pkgutils.VPtr(120000),
 			currency:    pkgutils.VPtr("RU"),
 			wantMatch:   false,
@@ -1530,6 +1745,7 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 		},
 		{
 			name:        "valid match within bounds",
+			targetVac:   v,
 			salary:      pkgutils.VPtr(120000),
 			currency:    pkgutils.VPtr("RUB"),
 			wantMatch:   true,
@@ -1538,16 +1754,26 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 		},
 		{
 			name:        "valid match exceeding bounds",
+			targetVac:   v,
 			salary:      pkgutils.VPtr(160000),
 			currency:    pkgutils.VPtr("RUB"),
 			wantMatch:   false,
 			wantErr:     false,
 			expectedErr: nil,
 		},
+		{
+			name:        "vacancy without salary matches any salary filter",
+			targetVac:   vacNoSalary,
+			salary:      pkgutils.VPtr(200000),
+			currency:    pkgutils.VPtr("USD"),
+			wantMatch:   true,
+			wantErr:     false,
+			expectedErr: nil,
+		},
 	}
 	for _, tt := range matchSalaryTests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := v.MatchBySalary(tt.salary, tt.currency)
+			got, err := tt.targetVac.MatchBySalary(tt.salary, tt.currency)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.False(t, got)
@@ -1558,133 +1784,4 @@ func TestVacancy_BusinessLogic(t *testing.T) {
 			}
 		})
 	}
-
-	vacNoSalary, err := NewVacancy(
-		gofakeit.UUID(), "hh", fakeValidTitle(), nil, nil,
-		"lead", []string{"remote"}, nil,
-		fakeValidDescription(), fakeValidURL(), pubAt, parsedAt,
-	)
-	assert.NoError(t, err)
-	got, err := vacNoSalary.MatchBySalary(pkgutils.VPtr(200000), pkgutils.VPtr("USD"))
-	assert.NoError(t, err)
-	assert.True(t, got)
-}
-
-func TestVacancy_Mutations(t *testing.T) {
-	now := time.Now()
-	pubAt := now.Add(-3 * time.Hour)
-	parsedAt := now.Add(-2 * time.Hour)
-
-	v, err := NewVacancy(
-		gofakeit.UUID(), "hh", fakeValidTitle(), nil, nil,
-		"junior", []string{"remote"}, nil,
-		fakeValidDescription(), fakeValidURL(), pubAt, parsedAt,
-	)
-	assert.NoError(t, err)
-
-	newTitle := fakeValidTitle()
-	newCompany := fakeValidCompany()
-	newDesc := fakeValidDescription()
-	newURL := fakeValidURL()
-	newParsedAt := now.Add(-1 * time.Hour)
-	newSalary, err := NewSalary(nil, pkgutils.VPtr(120000), pkgutils.VPtr(180000), pkgutils.VPtr("RUB"))
-	assert.NoError(t, err)
-	newLoc, err := NewLocation(nil, pkgutils.VPtr("Russia"), pkgutils.VPtr("Kazan"))
-	assert.NoError(t, err)
-
-	err = v.Update(
-		newTitle, pkgutils.VPtr(newCompany), newSalary,
-		"middle", []string{"office", "hybrid"}, newLoc,
-		newDesc, newURL, newParsedAt,
-	)
-	assert.NoError(t, err)
-	assert.Equal(t, newTitle, v.Title())
-	assert.Equal(t, pkgutils.VPtr(newCompany), v.Company())
-	assert.Equal(t, newSalary, v.Salary())
-	assert.Equal(t, GradeMiddle, v.Grade())
-	assert.Equal(t, []EmploymentType{EmploymentOffice, EmploymentHybrid}, v.EmploymentTypes())
-	assert.Equal(t, newLoc, v.Location())
-	assert.Equal(t, newDesc, v.Description())
-	assert.Equal(t, newURL, v.URL())
-	assert.Equal(t, newParsedAt, v.ParsedAt())
-
-	err = v.Update(
-		newTitle, nil, nil,
-		"senior", []string{"remote"}, nil,
-		newDesc, newURL, newParsedAt,
-	)
-	assert.NoError(t, err)
-	assert.Nil(t, v.Company())
-	assert.Nil(t, v.Salary())
-	assert.Nil(t, v.Location())
-
-	err = v.Update(
-		"", pkgutils.VPtr(newCompany), newSalary,
-		"middle", []string{"office"}, newLoc,
-		newDesc, newURL, newParsedAt,
-	)
-	assert.Equal(t, pkgerrs.NewValueRequiredError("title"), err)
-
-	err = v.Update(
-		newTitle, pkgutils.VPtr("A"), newSalary,
-		"middle", []string{"office"}, newLoc,
-		newDesc, newURL, newParsedAt,
-	)
-	assert.Equal(t, pkgerrs.NewValueInvalidError("company"), err)
-
-	err = v.Update(
-		newTitle, pkgutils.VPtr(newCompany), newSalary,
-		gofakeit.ProductName(), []string{"office"}, newLoc,
-		newDesc, newURL, newParsedAt,
-	)
-	assert.Equal(t, pkgerrs.NewValueInvalidError("grade"), err)
-
-	err = v.Update(
-		newTitle, pkgutils.VPtr(newCompany), newSalary,
-		"middle", []string{}, newLoc,
-		newDesc, newURL, newParsedAt,
-	)
-	assert.Equal(t, pkgerrs.NewValueRequiredError("employment_types"), err)
-
-	err = v.Update(
-		newTitle, pkgutils.VPtr(newCompany), newSalary,
-		"middle", []string{"office"}, newLoc,
-		"", newURL, newParsedAt,
-	)
-	assert.Equal(t, pkgerrs.NewValueRequiredError("description"), err)
-
-	err = v.Update(
-		newTitle, pkgutils.VPtr(newCompany), newSalary,
-		"middle", []string{"office"}, newLoc,
-		newDesc, "", newParsedAt,
-	)
-	assert.Equal(t, pkgerrs.NewValueRequiredError("url"), err)
-
-	err = v.Update(
-		newTitle, pkgutils.VPtr(newCompany), newSalary,
-		"middle", []string{"office"}, newLoc,
-		newDesc, newURL, pubAt.Add(-10*time.Minute),
-	)
-	assert.Equal(t, pkgerrs.NewValueInvalidError("parsed_at"), err)
-
-	newerParsedAt := now.Add(-30 * time.Minute)
-	err = v.UpdateParsedAt(newerParsedAt)
-	assert.NoError(t, err)
-	assert.Equal(t, newerParsedAt, v.ParsedAt())
-
-	err = v.UpdateParsedAt(pubAt.Add(-5 * time.Minute))
-	assert.Equal(t, pkgerrs.NewValueInvalidError("parsed_at"), err)
-
-	err = v.UpdateParsedAt(now.Add(10 * time.Minute))
-	assert.Equal(t, pkgerrs.NewValueInvalidError("parsed_at"), err)
-
-	anotherSalary, err := NewSalary(nil, pkgutils.VPtr(150000), nil, pkgutils.VPtr("USD"))
-	assert.NoError(t, err)
-	v.UpdateSalary(anotherSalary)
-	assert.Equal(t, anotherSalary, v.Salary())
-
-	anotherLoc, err := NewLocation(nil, pkgutils.VPtr("Germany"), pkgutils.VPtr("Munich"))
-	assert.NoError(t, err)
-	v.UpdateLocation(anotherLoc)
-	assert.Equal(t, anotherLoc, v.Location())
 }

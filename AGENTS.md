@@ -18,6 +18,7 @@
 
 ## 3. Unit Testing Standards
 При генерации юнит-тестов (*_test.go) обязательно соблюдай правила:
+- Все тесты должны быть написаны в `table-driven` стиле.
 - Используй генератор фейковых данных `github.com/brianvoe/gofakeit/v7` по максимуму во всех тестовых значениях. Избегай хардкода строк, где это возможно.
 - При использовании генератора `github.com/brianvoe/gofakeit/v7` **запрещено** вызывать функции `gofakeit.Word()` и `gofakeit.Sentence(n)`, вместо
   этого вызывай `gofakeit.ProductDescription()` или `gofakeit.ProductName()` в зависимости от назначения).
