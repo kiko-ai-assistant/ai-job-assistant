@@ -315,8 +315,8 @@ type Vacancy struct {
 
 	salary *Salary
 
-	grade          Grade
-	employmentType EmploymentType
+	grade           Grade
+	employmentTypes []EmploymentType
 
 	location    *Location
 	description string
@@ -329,7 +329,8 @@ func NewVacancy(
 	externalID, rawSource, title string,
 	company *string,
 	salary *Salary,
-	rawGrade, rawEmploymentType string,
+	rawGrade string,
+	rawEmploymentTypes []string,
 	location *Location,
 	description, url string,
 	publishedAt, parsedAt time.Time,
@@ -359,9 +360,13 @@ func NewVacancy(
 		return nil, err
 	}
 
-	employmentType, err := NewEmploymentType(rawEmploymentType)
-	if err != nil {
-		return nil, err
+	eTypes := make([]EmploymentType, 0, len(rawEmploymentTypes))
+	for _, raw := range rawEmploymentTypes {
+		employmentType, err := NewEmploymentType(raw)
+		if err != nil {
+			return nil, err
+		}
+		eTypes = append(eTypes, employmentType)
 	}
 
 	if len(description) == 0 {
@@ -387,19 +392,19 @@ func NewVacancy(
 	}
 
 	return &Vacancy{
-		id:             uuid.New(),
-		externalID:     externalID,
-		source:         source,
-		title:          title,
-		company:        company,
-		salary:         salary,
-		grade:          grade,
-		employmentType: employmentType,
-		location:       location,
-		description:    description,
-		url:            url,
-		publishedAt:    publishedAt,
-		parsedAt:       parsedAt,
+		id:              uuid.New(),
+		externalID:      externalID,
+		source:          source,
+		title:           title,
+		company:         company,
+		salary:          salary,
+		grade:           grade,
+		employmentTypes: eTypes,
+		location:        location,
+		description:     description,
+		url:             url,
+		publishedAt:     publishedAt,
+		parsedAt:        parsedAt,
 	}, nil
 }
 
@@ -411,43 +416,43 @@ func RestoreVacancy(
 	company *string,
 	salary *Salary,
 	grade Grade,
-	employmentType EmploymentType,
+	employmentTypes []EmploymentType,
 	location *Location,
 	description, url string,
 	publishedAt, parsedAt time.Time,
 ) *Vacancy {
 	return &Vacancy{
-		id:             id,
-		externalID:     externalID,
-		source:         source,
-		title:          title,
-		company:        company,
-		salary:         salary,
-		grade:          grade,
-		employmentType: employmentType,
-		location:       location,
-		description:    description,
-		url:            url,
-		publishedAt:    publishedAt,
-		parsedAt:       parsedAt,
+		id:              id,
+		externalID:      externalID,
+		source:          source,
+		title:           title,
+		company:         company,
+		salary:          salary,
+		grade:           grade,
+		employmentTypes: employmentTypes,
+		location:        location,
+		description:     description,
+		url:             url,
+		publishedAt:     publishedAt,
+		parsedAt:        parsedAt,
 	}
 }
 
 // ======================== Read-Only ========================
 
-func (v *Vacancy) ID() uuid.UUID                  { return v.id }
-func (v *Vacancy) ExternalID() string             { return v.externalID }
-func (v *Vacancy) Source() VacancySource          { return v.source }
-func (v *Vacancy) Title() string                  { return v.title }
-func (v *Vacancy) Company() *string               { return v.company }
-func (v *Vacancy) Salary() *Salary                { return v.salary }
-func (v *Vacancy) Grade() Grade                   { return v.grade }
-func (v *Vacancy) EmploymentType() EmploymentType { return v.employmentType }
-func (v *Vacancy) Location() *Location            { return v.location }
-func (v *Vacancy) Description() string            { return v.description }
-func (v *Vacancy) URL() string                    { return v.url }
-func (v *Vacancy) PublishedAt() time.Time         { return v.publishedAt }
-func (v *Vacancy) ParsedAt() time.Time            { return v.parsedAt }
+func (v *Vacancy) ID() uuid.UUID                     { return v.id }
+func (v *Vacancy) ExternalID() string                { return v.externalID }
+func (v *Vacancy) Source() VacancySource             { return v.source }
+func (v *Vacancy) Title() string                     { return v.title }
+func (v *Vacancy) Company() *string                  { return v.company }
+func (v *Vacancy) Salary() *Salary                   { return v.salary }
+func (v *Vacancy) Grade() Grade                      { return v.grade }
+func (v *Vacancy) EmploymentTypes() []EmploymentType { return v.employmentTypes }
+func (v *Vacancy) Location() *Location               { return v.location }
+func (v *Vacancy) Description() string               { return v.description }
+func (v *Vacancy) URL() string                       { return v.url }
+func (v *Vacancy) PublishedAt() time.Time            { return v.publishedAt }
+func (v *Vacancy) ParsedAt() time.Time               { return v.parsedAt }
 
 // ================ Business Logic ================
 
@@ -479,6 +484,21 @@ func (v *Vacancy) MatchBySalary(salary *int, currency *string) (bool, error) {
 	return v.salary.Match(*salary, *currency)
 }
 
+func (v *Vacancy) MatchByGrade(grade Grade) bool {
+	return grade == v.Grade()
+}
+
+func (v *Vacancy) MatchByEmploymentTypes(eTypes []EmploymentType) bool {
+	for _, eType := range eTypes {
+		for _, vacancyEType := range v.employmentTypes {
+			if eType == vacancyEType {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (v *Vacancy) MatchByLocation(country, city *string) (bool, error) {
 	if country == nil && city == nil { // nothing is specified - true
 		return true, nil
@@ -501,4 +521,8 @@ func (v *Vacancy) MatchByLocation(country, city *string) (bool, error) {
 	}
 
 	return v.location.Match(*country, city)
+}
+
+func (v *Vacancy) IsPublishedAfter(after time.Time) bool {
+	return v.publishedAt.After(after)
 }

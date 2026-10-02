@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS vacancies (
     currency VARCHAR(3),  -- USD, RUB, CNY
 
     grade grade NOT NULL,  -- Intern/Junior/Senior and etc
-    employment_type employment_type NOT NULL,
+    employment_type employment_type[] NOT NULL,
 
     location_text TEXT,
     country TEXT,
