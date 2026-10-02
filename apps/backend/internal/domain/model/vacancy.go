@@ -2,7 +2,7 @@ package model
 
 import (
 	pkgerrs "ai-job-assistant/backend/pkg/errs"
-	pkgtuils "ai-job-assistant/backend/pkg/utils"
+	pkgutils "ai-job-assistant/backend/pkg/utils"
 	"errors"
 	"strings"
 	"time"
@@ -31,11 +31,12 @@ const (
 )
 
 func NewVacancySource(raw string) (VacancySource, error) {
-	if len(raw) == 0 {
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) == 0 {
 		return "", pkgerrs.NewValueRequiredError("source")
 	}
 
-	source := VacancySource(strings.ToLower(raw))
+	source := VacancySource(strings.ToLower(trimmed))
 	if !source.IsValid() {
 		return "", pkgerrs.NewValueInvalidError("source")
 	}
@@ -62,11 +63,12 @@ const (
 )
 
 func NewGrade(raw string) (Grade, error) {
-	if len(raw) == 0 {
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) == 0 {
 		return "", pkgerrs.NewValueRequiredError("grade")
 	}
 
-	grade := Grade(raw)
+	grade := Grade(strings.ToLower(trimmed))
 	if !grade.IsValid() {
 		return "", pkgerrs.NewValueInvalidError("grade")
 	}
@@ -94,11 +96,12 @@ const (
 )
 
 func NewEmploymentType(raw string) (EmploymentType, error) {
-	if len(raw) == 0 {
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) == 0 {
 		return "", pkgerrs.NewValueRequiredError("employment_type")
 	}
 
-	eType := EmploymentType(raw)
+	eType := EmploymentType(strings.ToLower(trimmed))
 	if !eType.IsValid() {
 		return "", pkgerrs.NewValueInvalidError("employment_type")
 	}
@@ -127,7 +130,7 @@ func NewSalary(text *string, from, to *int, currency *string) (*Salary, error) {
 		return nil, nil
 	}
 
-	if text != nil && !pkgtuils.StrWithinRange(*text, minSalaryLen, maxSalaryLen, true) {
+	if text != nil && !pkgutils.StrWithinRange(*text, minSalaryLen, maxSalaryLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("salary_text")
 	}
 
@@ -151,7 +154,7 @@ func NewSalary(text *string, from, to *int, currency *string) (*Salary, error) {
 		return nil, ErrCurrencyWithoutSalary
 	}
 
-	if currency != nil && !pkgtuils.StrWithinRange(*currency, minCurrencyLen, maxCurrencyLen, false) {
+	if currency != nil && !pkgutils.StrWithinRange(*currency, minCurrencyLen, maxCurrencyLen, false) {
 		return nil, pkgerrs.NewValueInvalidError("currency")
 	}
 
@@ -184,11 +187,19 @@ func (s *Salary) Currency() *string { return s.currency }
 
 // ================ Business Logic ================
 
+func (s *Salary) HasBounds() bool {
+	return s != nil && (s.from != nil || s.to != nil)
+}
+
+func (s *Salary) IsNegotiable() bool {
+	return s != nil && s.from == nil && s.to == nil && s.text != nil
+}
+
 func (s *Salary) Match(salary int, currency string) (bool, error) {
 	if salary < minSalaryVal || salary > maxSalaryVal {
 		return false, pkgerrs.NewValueInvalidError("salary")
 	}
-	if !pkgtuils.StrWithinRange(currency, minCurrencyLen, maxCurrencyLen, false) {
+	if !pkgutils.StrWithinRange(currency, minCurrencyLen, maxCurrencyLen, false) {
 		return false, pkgerrs.NewValueInvalidError("currency")
 	}
 
@@ -224,13 +235,13 @@ func NewLocation(text, country, city *string) (*Location, error) {
 		return nil, nil
 	}
 
-	if text != nil && !pkgtuils.StrWithinRange(*text, minLocTextLen, maxLocTextLen, true) {
+	if text != nil && !pkgutils.StrWithinRange(*text, minLocTextLen, maxLocTextLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("location_text")
 	}
-	if country != nil && !pkgtuils.StrWithinRange(*country, minLocCountryLen, maxLocCountryLen, true) {
+	if country != nil && !pkgutils.StrWithinRange(*country, minLocCountryLen, maxLocCountryLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("location_country")
 	}
-	if city != nil && !pkgtuils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
+	if city != nil && !pkgutils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("location_city")
 	}
 
@@ -246,6 +257,9 @@ func NewLocation(text, country, city *string) (*Location, error) {
 }
 
 func RestoreLocation(text, country, city *string) *Location {
+	if text == nil && country == nil && city == nil {
+		return nil
+	}
 	return &Location{text: text, country: country, city: city}
 }
 
@@ -257,11 +271,19 @@ func (l *Location) City() *string    { return l.city }
 
 // ================ Business Logic ================
 
+func (l *Location) HasCountry() bool {
+	return l != nil && l.country != nil
+}
+
+func (l *Location) HasCity() bool {
+	return l != nil && l.city != nil
+}
+
 func (l *Location) Match(country string, city *string) (bool, error) {
-	if !pkgtuils.StrWithinRange(country, minLocCountryLen, maxLocCountryLen, true) {
+	if !pkgutils.StrWithinRange(country, minLocCountryLen, maxLocCountryLen, true) {
 		return false, pkgerrs.NewValueInvalidError("country")
 	}
-	if city != nil && !pkgtuils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
+	if city != nil && !pkgutils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
 		return false, pkgerrs.NewValueInvalidError("city")
 	}
 
@@ -293,7 +315,7 @@ const (
 	minTitleLen, maxTitleLen             = 3, 100
 	minCompanyLen, maxCompanyLen         = 2, 100
 	minSalaryLen, maxSalaryLen           = 2, 150
-	minSalaryVal, maxSalaryVal           = 0, 100000000 // 10^8 (e.g. a billion)
+	minSalaryVal, maxSalaryVal           = 0, 100000000 // 10^8 (e.g. 100 million)
 	minCurrencyLen, maxCurrencyLen       = 3, 3
 	minLocTextLen, maxLocTextLen         = 2, 80
 	minLocCountryLen, maxLocCountryLen   = 2, 40
@@ -335,7 +357,7 @@ func NewVacancy(
 	description, url string,
 	publishedAt, parsedAt time.Time,
 ) (*Vacancy, error) {
-	if len(externalID) == 0 {
+	if len(strings.TrimSpace(externalID)) == 0 {
 		return nil, pkgerrs.NewValueRequiredError("external_id")
 	}
 
@@ -344,14 +366,14 @@ func NewVacancy(
 		return nil, err
 	}
 
-	if len(title) == 0 {
+	if len(strings.TrimSpace(title)) == 0 {
 		return nil, pkgerrs.NewValueRequiredError("title")
 	}
-	if !pkgtuils.StrWithinRange(title, minTitleLen, maxTitleLen, true) {
+	if !pkgutils.StrWithinRange(title, minTitleLen, maxTitleLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("title")
 	}
 
-	if company != nil && !pkgtuils.StrWithinRange(*company, minCompanyLen, maxCompanyLen, true) {
+	if company != nil && !pkgutils.StrWithinRange(*company, minCompanyLen, maxCompanyLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("company")
 	}
 
@@ -360,26 +382,34 @@ func NewVacancy(
 		return nil, err
 	}
 
+	if len(rawEmploymentTypes) == 0 {
+		return nil, pkgerrs.NewValueRequiredError("employment_types")
+	}
+
+	seenETypes := make(map[EmploymentType]struct{}, len(rawEmploymentTypes))
 	eTypes := make([]EmploymentType, 0, len(rawEmploymentTypes))
 	for _, raw := range rawEmploymentTypes {
 		employmentType, err := NewEmploymentType(raw)
 		if err != nil {
 			return nil, err
 		}
-		eTypes = append(eTypes, employmentType)
+		if _, exists := seenETypes[employmentType]; !exists {
+			seenETypes[employmentType] = struct{}{}
+			eTypes = append(eTypes, employmentType)
+		}
 	}
 
-	if len(description) == 0 {
+	if len(strings.TrimSpace(description)) == 0 {
 		return nil, pkgerrs.NewValueRequiredError("description")
 	}
-	if !pkgtuils.StrWithinRange(description, minDescriptionLen, maxDescriptionLen, true) {
+	if !pkgutils.StrWithinRange(description, minDescriptionLen, maxDescriptionLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("description")
 	}
 
-	if len(url) == 0 {
+	if len(strings.TrimSpace(url)) == 0 {
 		return nil, pkgerrs.NewValueRequiredError("url")
 	}
-	if !pkgtuils.StrWithinRange(url, minURLLen, maxURLLen, true) {
+	if !pkgutils.StrWithinRange(url, minURLLen, maxURLLen, true) {
 		return nil, pkgerrs.NewValueInvalidError("url")
 	}
 
@@ -421,6 +451,12 @@ func RestoreVacancy(
 	description, url string,
 	publishedAt, parsedAt time.Time,
 ) *Vacancy {
+	var eTypes []EmploymentType
+	if employmentTypes != nil {
+		eTypes = make([]EmploymentType, len(employmentTypes))
+		copy(eTypes, employmentTypes)
+	}
+
 	return &Vacancy{
 		id:              id,
 		externalID:      externalID,
@@ -429,7 +465,7 @@ func RestoreVacancy(
 		company:         company,
 		salary:          salary,
 		grade:           grade,
-		employmentTypes: employmentTypes,
+		employmentTypes: eTypes,
 		location:        location,
 		description:     description,
 		url:             url,
@@ -440,29 +476,120 @@ func RestoreVacancy(
 
 // ======================== Read-Only ========================
 
-func (v *Vacancy) ID() uuid.UUID                     { return v.id }
-func (v *Vacancy) ExternalID() string                { return v.externalID }
-func (v *Vacancy) Source() VacancySource             { return v.source }
-func (v *Vacancy) Title() string                     { return v.title }
-func (v *Vacancy) Company() *string                  { return v.company }
-func (v *Vacancy) Salary() *Salary                   { return v.salary }
-func (v *Vacancy) Grade() Grade                      { return v.grade }
-func (v *Vacancy) EmploymentTypes() []EmploymentType { return v.employmentTypes }
-func (v *Vacancy) Location() *Location               { return v.location }
-func (v *Vacancy) Description() string               { return v.description }
-func (v *Vacancy) URL() string                       { return v.url }
-func (v *Vacancy) PublishedAt() time.Time            { return v.publishedAt }
-func (v *Vacancy) ParsedAt() time.Time               { return v.parsedAt }
+func (v *Vacancy) ID() uuid.UUID      { return v.id }
+func (v *Vacancy) ExternalID() string { return v.externalID }
+func (v *Vacancy) Source() VacancySource {
+	return v.source
+}
+func (v *Vacancy) Title() string       { return v.title }
+func (v *Vacancy) Company() *string    { return v.company }
+func (v *Vacancy) Salary() *Salary     { return v.salary }
+func (v *Vacancy) Grade() Grade        { return v.grade }
+func (v *Vacancy) Location() *Location { return v.location }
+func (v *Vacancy) Description() string { return v.description }
+func (v *Vacancy) URL() string         { return v.url }
+func (v *Vacancy) PublishedAt() time.Time {
+	return v.publishedAt
+}
+func (v *Vacancy) ParsedAt() time.Time { return v.parsedAt }
+
+func (v *Vacancy) EmploymentTypes() []EmploymentType {
+	if v.employmentTypes == nil {
+		return nil
+	}
+	res := make([]EmploymentType, len(v.employmentTypes))
+	copy(res, v.employmentTypes)
+	return res
+}
+
+func (v *Vacancy) SalaryText() *string {
+	if v.salary == nil {
+		return nil
+	}
+	return v.salary.Text()
+}
+
+func (v *Vacancy) SalaryFrom() *int {
+	if v.salary == nil {
+		return nil
+	}
+	return v.salary.From()
+}
+
+func (v *Vacancy) SalaryTo() *int {
+	if v.salary == nil {
+		return nil
+	}
+	return v.salary.To()
+}
+
+func (v *Vacancy) SalaryCurrency() *string {
+	if v.salary == nil {
+		return nil
+	}
+	return v.salary.Currency()
+}
+
+func (v *Vacancy) LocationCountry() *string {
+	if v.location == nil {
+		return nil
+	}
+	return v.location.Country()
+}
+
+func (v *Vacancy) LocationCity() *string {
+	if v.location == nil {
+		return nil
+	}
+	return v.location.City()
+}
+
+func (v *Vacancy) HasSalary() bool {
+	return v.salary != nil
+}
+
+func (v *Vacancy) HasLocation() bool {
+	return v.location != nil
+}
+
+func (v *Vacancy) HasCompany() bool {
+	return v.company != nil
+}
+
+func (v *Vacancy) HasEmploymentType(eType EmploymentType) bool {
+	for _, et := range v.employmentTypes {
+		if strings.EqualFold(string(et), string(eType)) {
+			return true
+		}
+	}
+	return false
+}
 
 // ================ Business Logic ================
 
-func (v *Vacancy) FromHH() bool       { return v.source == SourceHH }
-func (v *Vacancy) FromTelegram() bool { return v.source == SourceTelegram }
-func (v *Vacancy) FromOzon() bool     { return v.source == SourceOzon }
+func (v *Vacancy) FromHH() bool                  { return v.source == SourceHH }
+func (v *Vacancy) FromTelegram() bool            { return v.source == SourceTelegram }
+func (v *Vacancy) FromOzon() bool                { return v.source == SourceOzon }
+func (v *Vacancy) IsFrom(s VacancySource) bool   { return v.source == s }
+func (v *Vacancy) IsPublishedAfter(after time.Time) bool {
+	return v.publishedAt.After(after)
+}
+
+func (v *Vacancy) IsExpired() bool {
+	return time.Since(v.publishedAt) > vacancyValidUpTo
+}
+
+func (v *Vacancy) IsExpiredAt(t time.Time) bool {
+	return t.Sub(v.publishedAt) > vacancyValidUpTo
+}
 
 func (v *Vacancy) MatchBySalary(salary *int, currency *string) (bool, error) {
-	if salary == nil {
+	if salary == nil && currency == nil {
 		return true, nil
+	}
+
+	if salary == nil && currency != nil {
+		return false, ErrCurrencyWithoutSalary
 	}
 
 	if *salary < minSalaryVal || *salary > maxSalaryVal {
@@ -473,7 +600,7 @@ func (v *Vacancy) MatchBySalary(salary *int, currency *string) (bool, error) {
 		return false, ErrSalaryRequiresCurrency
 	}
 
-	if len(*currency) < minCurrencyLen || len(*currency) > maxCurrencyLen {
+	if !pkgutils.StrWithinRange(*currency, minCurrencyLen, maxCurrencyLen, false) {
 		return false, pkgerrs.NewValueInvalidError("currency")
 	}
 
@@ -485,13 +612,19 @@ func (v *Vacancy) MatchBySalary(salary *int, currency *string) (bool, error) {
 }
 
 func (v *Vacancy) MatchByGrade(grade Grade) bool {
-	return grade == v.Grade()
+	if grade == "" {
+		return true
+	}
+	return strings.EqualFold(string(v.grade), string(grade))
 }
 
 func (v *Vacancy) MatchByEmploymentTypes(eTypes []EmploymentType) bool {
+	if len(eTypes) == 0 {
+		return true
+	}
 	for _, eType := range eTypes {
 		for _, vacancyEType := range v.employmentTypes {
-			if eType == vacancyEType {
+			if strings.EqualFold(string(eType), string(vacancyEType)) {
 				return true
 			}
 		}
@@ -508,11 +641,11 @@ func (v *Vacancy) MatchByLocation(country, city *string) (bool, error) {
 		return false, ErrCityWithoutCountry
 	}
 
-	if !pkgtuils.StrWithinRange(*country, minLocCountryLen, maxLocCountryLen, true) {
+	if !pkgutils.StrWithinRange(*country, minLocCountryLen, maxLocCountryLen, true) {
 		return false, pkgerrs.NewValueInvalidError("country")
 	}
 
-	if city != nil && !pkgtuils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
+	if city != nil && !pkgutils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
 		return false, pkgerrs.NewValueInvalidError("city")
 	}
 
@@ -523,6 +656,96 @@ func (v *Vacancy) MatchByLocation(country, city *string) (bool, error) {
 	return v.location.Match(*country, city)
 }
 
-func (v *Vacancy) IsPublishedAfter(after time.Time) bool {
-	return v.publishedAt.After(after)
+// ================ Mutation ================
+
+func (v *Vacancy) Update(
+	title string,
+	company *string,
+	salary *Salary,
+	rawGrade string,
+	rawEmploymentTypes []string,
+	location *Location,
+	description, url string,
+	parsedAt time.Time,
+) error {
+	if len(strings.TrimSpace(title)) == 0 {
+		return pkgerrs.NewValueRequiredError("title")
+	}
+	if !pkgutils.StrWithinRange(title, minTitleLen, maxTitleLen, true) {
+		return pkgerrs.NewValueInvalidError("title")
+	}
+
+	if company != nil && !pkgutils.StrWithinRange(*company, minCompanyLen, maxCompanyLen, true) {
+		return pkgerrs.NewValueInvalidError("company")
+	}
+
+	grade, err := NewGrade(rawGrade)
+	if err != nil {
+		return err
+	}
+
+	if len(rawEmploymentTypes) == 0 {
+		return pkgerrs.NewValueRequiredError("employment_types")
+	}
+
+	seenETypes := make(map[EmploymentType]struct{}, len(rawEmploymentTypes))
+	eTypes := make([]EmploymentType, 0, len(rawEmploymentTypes))
+	for _, raw := range rawEmploymentTypes {
+		employmentType, err := NewEmploymentType(raw)
+		if err != nil {
+			return err
+		}
+		if _, exists := seenETypes[employmentType]; !exists {
+			seenETypes[employmentType] = struct{}{}
+			eTypes = append(eTypes, employmentType)
+		}
+	}
+
+	if len(strings.TrimSpace(description)) == 0 {
+		return pkgerrs.NewValueRequiredError("description")
+	}
+	if !pkgutils.StrWithinRange(description, minDescriptionLen, maxDescriptionLen, true) {
+		return pkgerrs.NewValueInvalidError("description")
+	}
+
+	if len(strings.TrimSpace(url)) == 0 {
+		return pkgerrs.NewValueRequiredError("url")
+	}
+	if !pkgutils.StrWithinRange(url, minURLLen, maxURLLen, true) {
+		return pkgerrs.NewValueInvalidError("url")
+	}
+
+	now := time.Now()
+	if parsedAt.Before(v.publishedAt) || parsedAt.After(now.Add(maxFutureTimeSkew)) {
+		return pkgerrs.NewValueInvalidError("parsed_at")
+	}
+
+	v.title = title
+	v.company = company
+	v.salary = salary
+	v.grade = grade
+	v.employmentTypes = eTypes
+	v.location = location
+	v.description = description
+	v.url = url
+	v.parsedAt = parsedAt
+
+	return nil
+}
+
+func (v *Vacancy) UpdateParsedAt(parsedAt time.Time) error {
+	now := time.Now()
+	if parsedAt.Before(v.publishedAt) || parsedAt.After(now.Add(maxFutureTimeSkew)) {
+		return pkgerrs.NewValueInvalidError("parsed_at")
+	}
+	v.parsedAt = parsedAt
+	return nil
+}
+
+func (v *Vacancy) UpdateSalary(salary *Salary) {
+	v.salary = salary
+}
+
+func (v *Vacancy) UpdateLocation(location *Location) {
+	v.location = location
 }

@@ -147,13 +147,13 @@ func TestVacancy_MatchByLocation(t *testing.T) {
 
 	vacWithLoc := RestoreVacancy(
 		uuid.New(), "ext1", SourceHH, "Go Developer", nil, nil,
-		GradeMiddle, EmploymentRemote, loc, "Description text description text description...",
+		GradeMiddle, []EmploymentType{EmploymentRemote}, loc, "Description text description text description...",
 		"https://example.com/vac", time.Now(), time.Now(),
 	)
 
 	vacWithoutLoc := RestoreVacancy(
 		uuid.New(), "ext2", SourceHH, "Go Developer", nil, nil,
-		GradeMiddle, EmploymentRemote, nil, "Description text description text description...",
+		GradeMiddle, []EmploymentType{EmploymentRemote}, nil, "Description text description text description...",
 		"https://example.com/vac", time.Now(), time.Now(),
 	)
 
