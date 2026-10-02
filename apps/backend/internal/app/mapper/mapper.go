@@ -1,0 +1,110 @@
+package mapper
+
+import (
+	"ai-job-assistant/backend/internal/app/dto"
+	"ai-job-assistant/backend/internal/domain/model"
+)
+
+func toSalaryDomain(d *dto.SalaryDTO) (*model.Salary, error) {
+	if d == nil {
+		return nil, nil
+	}
+	return model.NewSalary(d.Text, d.From, d.To, d.Currency)
+}
+
+func toSalaryDTO(s *model.Salary) dto.SalaryDTO {
+	if s == nil {
+		return dto.SalaryDTO{}
+	}
+	return dto.SalaryDTO{
+		Text:     s.Text(),
+		From:     s.From(),
+		To:       s.To(),
+		Currency: s.Currency(),
+	}
+}
+
+func toLocationDomain(d *dto.LocationDTO) (*model.Location, error) {
+	if d == nil {
+		return nil, nil
+	}
+	return model.NewLocation(d.Text, d.Country, d.City)
+}
+
+func toLocationDTO(l *model.Location) dto.LocationDTO {
+	if l == nil {
+		return dto.LocationDTO{}
+	}
+	return dto.LocationDTO{
+		Text:    l.Text(),
+		Country: l.Country(),
+		City:    l.City(),
+	}
+}
+
+func toEmploymentTypesStrings(types []model.EmploymentType) []string {
+	if types == nil {
+		return nil
+	}
+	res := make([]string, len(types))
+	for i, t := range types {
+		res[i] = t.String()
+	}
+	return res
+}
+
+func ToVacancyDomain(in dto.CreateVacancyInput) (*model.Vacancy, error) {
+	salary, err := toSalaryDomain(in.Salary)
+	if err != nil {
+		return nil, err
+	}
+
+	location, err := toLocationDomain(in.Location)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.NewVacancy(
+		in.ExternalID,
+		in.Source,
+		in.Title,
+		in.Company,
+		salary,
+		in.Grade,
+		in.EmploymentTypes,
+		location,
+		in.Description,
+		in.URL,
+		in.PublishedAt,
+		in.ParsedAt,
+	)
+}
+
+func ToVacancyDTO(v *model.Vacancy) *dto.VacancyDTO {
+	if v == nil {
+		return nil
+	}
+	return &dto.VacancyDTO{
+		ID:              v.ID(),
+		ExternalID:      v.ExternalID(),
+		Source:          v.Source().String(),
+		Title:           v.Title(),
+		Company:         v.Company(),
+		Salary:          toSalaryDTO(v.Salary()),
+		Grade:           v.Grade().String(),
+		EmploymentTypes: toEmploymentTypesStrings(v.EmploymentTypes()),
+		Location:        toLocationDTO(v.Location()),
+		Description:     v.Description(),
+		URL:             v.URL(),
+		PublishedAt:     v.PublishedAt(),
+		ParsedAt:        v.ParsedAt(),
+	}
+}
+
+func ToCreateVacancyOutput(v *model.Vacancy) *dto.CreateVacancyOutput {
+	if v == nil {
+		return nil
+	}
+	res := dto.CreateVacancyOutput(*ToVacancyDTO(v))
+	return &res
+}
