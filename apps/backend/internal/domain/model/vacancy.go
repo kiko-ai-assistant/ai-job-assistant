@@ -188,7 +188,7 @@ func (s *Salary) Match(salary int, currency string) (bool, error) {
 	if salary < minSalaryVal || salary > maxSalaryVal {
 		return false, pkgerrs.NewValueInvalidError("salary")
 	}
-	if len(currency) < minCurrencyLen || len(currency) > maxCurrencyLen {
+	if !pkgtuils.StrWithinRange(currency, minCurrencyLen, maxCurrencyLen, false) {
 		return false, pkgerrs.NewValueInvalidError("currency")
 	}
 
@@ -257,13 +257,34 @@ func (l *Location) City() *string    { return l.city }
 
 // ================ Business Logic ================
 
-func (l *Location) Match(country, city *string) (bool, error) {
-	if country != nil && !pkgtuils.StrWithinRange(*country, minLocCountryLen, maxLocCountryLen, true) {
+func (l *Location) Match(country string, city *string) (bool, error) {
+	if !pkgtuils.StrWithinRange(country, minLocCountryLen, maxLocCountryLen, true) {
 		return false, pkgerrs.NewValueInvalidError("country")
 	}
 	if city != nil && !pkgtuils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
 		return false, pkgerrs.NewValueInvalidError("city")
 	}
+
+	if l == nil || (l.country == nil && l.city == nil) { // vacancy has no location filters - true
+		return true, nil
+	}
+
+	if l.country != nil && !strings.EqualFold(*l.country, country) { // countries discrepancy
+		return false, nil
+	}
+
+	if city != nil {
+		if l.city != nil {
+			return strings.EqualFold(*l.city, *city), nil // match by cities
+		}
+		return false, nil // vacancy has no city but user requested specific city
+	}
+
+	if l.country != nil { // countries are matched
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // ================ Rich model of Vacancy ================
@@ -297,7 +318,7 @@ type Vacancy struct {
 	grade          Grade
 	employmentType EmploymentType
 
-	location    *string
+	location    *Location
 	description string
 	url         string
 	publishedAt time.Time
@@ -309,7 +330,7 @@ func NewVacancy(
 	company *string,
 	salary *Salary,
 	rawGrade, rawEmploymentType string,
-	location *string,
+	location *Location,
 	description, url string,
 	publishedAt, parsedAt time.Time,
 ) (*Vacancy, error) {
@@ -341,10 +362,6 @@ func NewVacancy(
 	employmentType, err := NewEmploymentType(rawEmploymentType)
 	if err != nil {
 		return nil, err
-	}
-
-	if location != nil && !pkgtuils.StrWithinRange(*location, minLocTextLen, maxLocTextLen, true) {
-		return nil, pkgerrs.NewValueInvalidError("location")
 	}
 
 	if len(description) == 0 {
@@ -395,7 +412,7 @@ func RestoreVacancy(
 	salary *Salary,
 	grade Grade,
 	employmentType EmploymentType,
-	location *string,
+	location *Location,
 	description, url string,
 	publishedAt, parsedAt time.Time,
 ) *Vacancy {
@@ -426,7 +443,7 @@ func (v *Vacancy) Company() *string               { return v.company }
 func (v *Vacancy) Salary() *Salary                { return v.salary }
 func (v *Vacancy) Grade() Grade                   { return v.grade }
 func (v *Vacancy) EmploymentType() EmploymentType { return v.employmentType }
-func (v *Vacancy) Location() *string              { return v.location }
+func (v *Vacancy) Location() *Location            { return v.location }
 func (v *Vacancy) Description() string            { return v.description }
 func (v *Vacancy) URL() string                    { return v.url }
 func (v *Vacancy) PublishedAt() time.Time         { return v.publishedAt }
@@ -438,11 +455,20 @@ func (v *Vacancy) FromHH() bool       { return v.source == SourceHH }
 func (v *Vacancy) FromTelegram() bool { return v.source == SourceTelegram }
 func (v *Vacancy) FromOzon() bool     { return v.source == SourceOzon }
 
-func (v *Vacancy) MatchBySalary(salary int, currency string) (bool, error) {
-	if salary < minSalaryVal || salary > maxSalaryVal {
+func (v *Vacancy) MatchBySalary(salary *int, currency *string) (bool, error) {
+	if salary == nil {
+		return true, nil
+	}
+
+	if *salary < minSalaryVal || *salary > maxSalaryVal {
 		return false, pkgerrs.NewValueInvalidError("salary")
 	}
-	if len(currency) < minCurrencyLen || len(currency) > maxCurrencyLen {
+
+	if currency == nil {
+		return false, ErrSalaryRequiresCurrency
+	}
+
+	if len(*currency) < minCurrencyLen || len(*currency) > maxCurrencyLen {
 		return false, pkgerrs.NewValueInvalidError("currency")
 	}
 
@@ -450,5 +476,29 @@ func (v *Vacancy) MatchBySalary(salary int, currency string) (bool, error) {
 		return true, nil
 	}
 
-	return v.salary.Match(salary, currency)
+	return v.salary.Match(*salary, *currency)
+}
+
+func (v *Vacancy) MatchByLocation(country, city *string) (bool, error) {
+	if country == nil && city == nil { // nothing is specified - true
+		return true, nil
+	}
+
+	if country == nil { // domain error: city cannot be specified without country
+		return false, ErrCityWithoutCountry
+	}
+
+	if !pkgtuils.StrWithinRange(*country, minLocCountryLen, maxLocCountryLen, true) {
+		return false, pkgerrs.NewValueInvalidError("country")
+	}
+
+	if city != nil && !pkgtuils.StrWithinRange(*city, minLocCityLen, maxLocCityLen, true) {
+		return false, pkgerrs.NewValueInvalidError("city")
+	}
+
+	if v.location == nil { // vacancy has no location filters - true
+		return true, nil
+	}
+
+	return v.location.Match(*country, city)
 }

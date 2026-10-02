@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -23,10 +24,13 @@ func ComparePtr[T comparable](s1, s2 *T) bool {
 }
 
 func StrWithinRange(s string, left, right int, utf bool) bool {
-	sLen := len(s)
+	trimmed := strings.TrimSpace(s)
+
+	sLen := len(trimmed)
 	if utf {
-		sLen = utf8.RuneCountInString(s)
+		sLen = utf8.RuneCountInString(trimmed)
 	}
+
 	return sLen >= left && sLen <= right
 }
 
