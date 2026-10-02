@@ -29,8 +29,8 @@ func (m *mockVacancyRepo) Create(ctx context.Context, vacancy *model.Vacancy) er
 	return nil
 }
 
-func (m *mockVacancyRepo) CreateMany(ctx context.Context, vacancies []*model.Vacancy) error {
-	return nil
+func (m *mockVacancyRepo) CreateMany(ctx context.Context, vacancies []*model.Vacancy) (port.CreateManyResult, error) {
+	return port.CreateManyResult{}, nil
 }
 
 func (m *mockVacancyRepo) Get(ctx context.Context, id uuid.UUID) (*model.Vacancy, error) {

@@ -6,6 +6,7 @@ import (
 
 	"ai-job-assistant/backend/internal/app/dto"
 	"ai-job-assistant/backend/internal/domain/model"
+	"ai-job-assistant/backend/internal/domain/port"
 	pkgerrs "ai-job-assistant/backend/pkg/errs"
 	pkgutils "ai-job-assistant/backend/pkg/utils"
 
@@ -343,3 +344,309 @@ func TestToCreateVacancyOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestVacancyDTOToDomain(t *testing.T) {
+	now := time.Now()
+	pubAt := now.Add(-2 * time.Hour)
+	parsedAt := now.Add(-1 * time.Hour)
+
+	validExtID := gofakeit.UUID()
+	validTitle := fakeValidTitle()
+	validCompany := fakeValidCompany()
+	validDesc := fakeValidDescription()
+	validURL := fakeValidURL()
+
+	tests := []struct {
+		name        string
+		input       dto.VacancyDTO
+		wantErr     bool
+		expectedErr error
+	}{
+		{
+			name: "full valid VacancyDTO with salary and location",
+			input: dto.VacancyDTO{
+				ID:         uuid.New(),
+				ExternalID: validExtID,
+				Source:     "hh",
+				Title:      validTitle,
+				Company:    pkgutils.VPtr(validCompany),
+				Salary: dto.SalaryDTO{
+					Text:     pkgutils.VPtr("100k - 150k"),
+					From:     pkgutils.VPtr(100000),
+					To:       pkgutils.VPtr(150000),
+					Currency: pkgutils.VPtr("RUB"),
+				},
+				Grade:           "middle",
+				EmploymentTypes: []string{"remote", "office"},
+				Location: dto.LocationDTO{
+					Text:    pkgutils.VPtr("Moscow"),
+					Country: pkgutils.VPtr("Russia"),
+					City:    pkgutils.VPtr("Moscow"),
+				},
+				Description: validDesc,
+				URL:         validURL,
+				PublishedAt: pubAt,
+				ParsedAt:    parsedAt,
+			},
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name: "minimal valid VacancyDTO with empty salary and location",
+			input: dto.VacancyDTO{
+				ID:              uuid.New(),
+				ExternalID:      gofakeit.UUID(),
+				Source:          "telegram",
+				Title:           fakeValidTitle(),
+				Company:         nil,
+				Salary:          dto.SalaryDTO{},
+				Grade:           "senior",
+				EmploymentTypes: []string{"hybrid"},
+				Location:        dto.LocationDTO{},
+				Description:     fakeValidDescription(),
+				URL:             fakeValidURL(),
+				PublishedAt:     pubAt,
+				ParsedAt:        parsedAt,
+			},
+			wantErr:     false,
+			expectedErr: nil,
+		},
+		{
+			name: "invalid salary range returns error",
+			input: dto.VacancyDTO{
+				ExternalID: validExtID,
+				Source:     "hh",
+				Title:      validTitle,
+				Company:    pkgutils.VPtr(validCompany),
+				Salary: dto.SalaryDTO{
+					From:     pkgutils.VPtr(200000),
+					To:       pkgutils.VPtr(100000),
+					Currency: pkgutils.VPtr("RUB"),
+				},
+				Grade:           "middle",
+				EmploymentTypes: []string{"remote"},
+				Description:     validDesc,
+				URL:             validURL,
+				PublishedAt:     pubAt,
+				ParsedAt:        parsedAt,
+			},
+			wantErr:     true,
+			expectedErr: model.ErrInvalidSalaryRange,
+		},
+		{
+			name: "invalid location city without country returns error",
+			input: dto.VacancyDTO{
+				ExternalID: validExtID,
+				Source:     "hh",
+				Title:      validTitle,
+				Company:    pkgutils.VPtr(validCompany),
+				Salary:     dto.SalaryDTO{},
+				Grade:      "middle",
+				EmploymentTypes: []string{
+					"remote",
+				},
+				Location: dto.LocationDTO{
+					City: pkgutils.VPtr("Moscow"),
+				},
+				Description: validDesc,
+				URL:         validURL,
+				PublishedAt: pubAt,
+				ParsedAt:    parsedAt,
+			},
+			wantErr:     true,
+			expectedErr: model.ErrCityWithoutCountry,
+		},
+		{
+			name: "invalid vacancy field empty title returns error",
+			input: dto.VacancyDTO{
+				ExternalID:      validExtID,
+				Source:          "hh",
+				Title:           "",
+				Company:         pkgutils.VPtr(validCompany),
+				Salary:          dto.SalaryDTO{},
+				Grade:           "middle",
+				EmploymentTypes: []string{"remote"},
+				Description:     validDesc,
+				URL:             validURL,
+				PublishedAt:     pubAt,
+				ParsedAt:        parsedAt,
+			},
+			wantErr:     true,
+			expectedErr: pkgerrs.NewValueRequiredError("title"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vac, err := VacancyDTOToDomain(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, vac)
+				if tt.expectedErr != nil {
+					assert.Equal(t, tt.expectedErr, err)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, vac)
+				assert.Equal(t, tt.input.ExternalID, vac.ExternalID())
+				assert.Equal(t, tt.input.Source, vac.Source().String())
+				assert.Equal(t, tt.input.Title, vac.Title())
+				assert.Equal(t, tt.input.Company, vac.Company())
+				assert.Equal(t, tt.input.Grade, vac.Grade().String())
+				assert.Equal(t, tt.input.Description, vac.Description())
+				assert.Equal(t, tt.input.URL, vac.URL())
+				assert.Equal(t, tt.input.PublishedAt, vac.PublishedAt())
+				assert.Equal(t, tt.input.ParsedAt, vac.ParsedAt())
+			}
+		})
+	}
+}
+
+func TestToVacanciesDomain(t *testing.T) {
+	now := time.Now()
+	pubAt := now.Add(-2 * time.Hour)
+	parsedAt := now.Add(-1 * time.Hour)
+
+	validDTO1 := dto.VacancyDTO{
+		ExternalID:      gofakeit.UUID(),
+		Source:          "hh",
+		Title:           fakeValidTitle(),
+		Grade:           "junior",
+		EmploymentTypes: []string{"remote"},
+		Description:     fakeValidDescription(),
+		URL:             fakeValidURL(),
+		PublishedAt:     pubAt,
+		ParsedAt:        parsedAt,
+	}
+
+	validDTO2 := dto.VacancyDTO{
+		ExternalID:      gofakeit.UUID(),
+		Source:          "ozon",
+		Title:           fakeValidTitle(),
+		Grade:           "middle",
+		EmploymentTypes: []string{"office"},
+		Description:     fakeValidDescription(),
+		URL:             fakeValidURL(),
+		PublishedAt:     pubAt,
+		ParsedAt:        parsedAt,
+	}
+
+	invalidDTO := dto.VacancyDTO{
+		ExternalID:      "",
+		Source:          "hh",
+		Title:           fakeValidTitle(),
+		Grade:           "junior",
+		EmploymentTypes: []string{"remote"},
+		Description:     fakeValidDescription(),
+		URL:             fakeValidURL(),
+		PublishedAt:     pubAt,
+		ParsedAt:        parsedAt,
+	}
+
+	tests := []struct {
+		name        string
+		items       []dto.VacancyDTO
+		wantNil     bool
+		wantLen     int
+		wantErr     bool
+		expectedErr error
+	}{
+		{
+			name:    "nil slice returns nil",
+			items:   nil,
+			wantNil: true,
+			wantLen: 0,
+			wantErr: false,
+		},
+		{
+			name:    "empty slice returns empty slice",
+			items:   []dto.VacancyDTO{},
+			wantNil: false,
+			wantLen: 0,
+			wantErr: false,
+		},
+		{
+			name:    "multiple valid items converted successfully",
+			items:   []dto.VacancyDTO{validDTO1, validDTO2},
+			wantNil: false,
+			wantLen: 2,
+			wantErr: false,
+		},
+		{
+			name:        "one invalid item in slice returns error",
+			items:       []dto.VacancyDTO{validDTO1, invalidDTO},
+			wantNil:     true,
+			wantLen:     0,
+			wantErr:     true,
+			expectedErr: pkgerrs.NewValueRequiredError("external_id"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := ToVacanciesDomain(tt.items)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, res)
+				if tt.expectedErr != nil {
+					assert.Equal(t, tt.expectedErr, err)
+				}
+			} else {
+				assert.NoError(t, err)
+				if tt.wantNil {
+					assert.Nil(t, res)
+				} else {
+					assert.NotNil(t, res)
+					assert.Len(t, res, tt.wantLen)
+				}
+			}
+		})
+	}
+}
+
+func TestToInsertVacanciesOutput(t *testing.T) {
+	tests := []struct {
+		name         string
+		res          port.CreateManyResult
+		wantInserted int
+		wantIgnored  int
+	}{
+		{
+			name: "all inserted zero ignored",
+			res: port.CreateManyResult{
+				Inserted: 10,
+				Ignored:  0,
+			},
+			wantInserted: 10,
+			wantIgnored:  0,
+		},
+		{
+			name: "some inserted some ignored",
+			res: port.CreateManyResult{
+				Inserted: 7,
+				Ignored:  3,
+			},
+			wantInserted: 7,
+			wantIgnored:  3,
+		},
+		{
+			name: "zero inserted all ignored",
+			res: port.CreateManyResult{
+				Inserted: 0,
+				Ignored:  5,
+			},
+			wantInserted: 0,
+			wantIgnored:  5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := ToInsertVacanciesOutput(tt.res)
+			assert.NotNil(t, out)
+			assert.Equal(t, tt.wantInserted, out.Inserted)
+			assert.Equal(t, tt.wantIgnored, out.Ignored)
+		})
+	}
+}
+

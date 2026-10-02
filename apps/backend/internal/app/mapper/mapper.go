@@ -3,6 +3,7 @@ package mapper
 import (
 	"ai-job-assistant/backend/internal/app/dto"
 	"ai-job-assistant/backend/internal/domain/model"
+	"ai-job-assistant/backend/internal/domain/port"
 )
 
 func toSalaryDomain(d *dto.SalaryDTO) (*model.Salary, error) {
@@ -80,6 +81,48 @@ func ToVacancyDomain(in dto.CreateVacancyInput) (*model.Vacancy, error) {
 	)
 }
 
+func VacancyDTOToDomain(d dto.VacancyDTO) (*model.Vacancy, error) {
+	salary, err := toSalaryDomain(&d.Salary)
+	if err != nil {
+		return nil, err
+	}
+
+	location, err := toLocationDomain(&d.Location)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.NewVacancy(
+		d.ExternalID,
+		d.Source,
+		d.Title,
+		d.Company,
+		salary,
+		d.Grade,
+		d.EmploymentTypes,
+		location,
+		d.Description,
+		d.URL,
+		d.PublishedAt,
+		d.ParsedAt,
+	)
+}
+
+func ToVacanciesDomain(items []dto.VacancyDTO) ([]*model.Vacancy, error) {
+	if items == nil {
+		return nil, nil
+	}
+	vacancies := make([]*model.Vacancy, len(items))
+	for i, item := range items {
+		v, err := VacancyDTOToDomain(item)
+		if err != nil {
+			return nil, err
+		}
+		vacancies[i] = v
+	}
+	return vacancies, nil
+}
+
 func ToVacancyDTO(v *model.Vacancy) *dto.VacancyDTO {
 	if v == nil {
 		return nil
@@ -107,4 +150,11 @@ func ToCreateVacancyOutput(v *model.Vacancy) *dto.CreateVacancyOutput {
 	}
 	res := dto.CreateVacancyOutput(*ToVacancyDTO(v))
 	return &res
+}
+
+func ToInsertVacanciesOutput(res port.CreateManyResult) *dto.InsertVacanciesOutput {
+	return &dto.InsertVacanciesOutput{
+		Inserted: res.Inserted,
+		Ignored:  res.Ignored,
+	}
 }
