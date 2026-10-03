@@ -158,3 +158,11 @@ func ToInsertVacanciesOutput(res port.CreateManyResult) *dto.InsertVacanciesOutp
 		Ignored:  res.Ignored,
 	}
 }
+
+func ToGetVacancyOutput(v *model.Vacancy) *dto.GetVacancyOutput {
+	if v == nil {
+		return nil
+	}
+	res := dto.GetVacancyOutput(*ToVacancyDTO(v))
+	return &res
+}

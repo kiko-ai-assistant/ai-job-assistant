@@ -650,3 +650,91 @@ func TestToInsertVacanciesOutput(t *testing.T) {
 	}
 }
 
+func TestToGetVacancyOutput(t *testing.T) {
+	now := time.Now()
+	pubAt := now.Add(-2 * time.Hour)
+	parsedAt := now.Add(-1 * time.Hour)
+
+	salary, err := model.NewSalary(pkgutils.VPtr("100k"), pkgutils.VPtr(100000), pkgutils.VPtr(150000), pkgutils.VPtr("RUB"))
+	assert.NoError(t, err)
+
+	location, err := model.NewLocation(pkgutils.VPtr("Moscow"), pkgutils.VPtr("Russia"), pkgutils.VPtr("Moscow"))
+	assert.NoError(t, err)
+
+	fullVac, err := model.NewVacancy(
+		gofakeit.UUID(), "hh", fakeValidTitle(), pkgutils.VPtr(fakeValidCompany()),
+		salary, "middle", []string{"remote", "office"}, location,
+		fakeValidDescription(), fakeValidURL(), pubAt, parsedAt,
+	)
+	assert.NoError(t, err)
+
+	minVac, err := model.NewVacancy(
+		gofakeit.UUID(), "mts", fakeValidTitle(), nil,
+		nil, "senior", []string{"hybrid"}, nil,
+		fakeValidDescription(), fakeValidURL(), pubAt, parsedAt,
+	)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		vac     *model.Vacancy
+		wantNil bool
+	}{
+		{
+			name:    "nil vacancy returns nil",
+			vac:     nil,
+			wantNil: true,
+		},
+		{
+			name:    "full vacancy mapped to get vacancy output",
+			vac:     fullVac,
+			wantNil: false,
+		},
+		{
+			name:    "minimal vacancy mapped to get vacancy output",
+			vac:     minVac,
+			wantNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := ToGetVacancyOutput(tt.vac)
+			if tt.wantNil {
+				assert.Nil(t, out)
+				return
+			}
+
+			assert.NotNil(t, out)
+			assert.Equal(t, tt.vac.ID(), out.ID)
+			assert.Equal(t, tt.vac.ExternalID(), out.ExternalID)
+			assert.Equal(t, tt.vac.Source().String(), out.Source)
+			assert.Equal(t, tt.vac.Title(), out.Title)
+			assert.Equal(t, tt.vac.Company(), out.Company)
+			assert.Equal(t, tt.vac.Grade().String(), out.Grade)
+			assert.Equal(t, tt.vac.Description(), out.Description)
+			assert.Equal(t, tt.vac.URL(), out.URL)
+			assert.Equal(t, tt.vac.PublishedAt(), out.PublishedAt)
+			assert.Equal(t, tt.vac.ParsedAt(), out.ParsedAt)
+
+			if tt.vac.Salary() != nil {
+				assert.Equal(t, tt.vac.Salary().Text(), out.Salary.Text)
+				assert.Equal(t, tt.vac.Salary().From(), out.Salary.From)
+				assert.Equal(t, tt.vac.Salary().To(), out.Salary.To)
+				assert.Equal(t, tt.vac.Salary().Currency(), out.Salary.Currency)
+			} else {
+				assert.Equal(t, dto.SalaryDTO{}, out.Salary)
+			}
+
+			if tt.vac.Location() != nil {
+				assert.Equal(t, tt.vac.Location().Text(), out.Location.Text)
+				assert.Equal(t, tt.vac.Location().Country(), out.Location.Country)
+				assert.Equal(t, tt.vac.Location().City(), out.Location.City)
+			} else {
+				assert.Equal(t, dto.LocationDTO{}, out.Location)
+			}
+		})
+	}
+}
+
+

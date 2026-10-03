@@ -30,9 +30,9 @@ var (
 	ErrUpdateOrderDB        = errors.New("failed to update order using db")
 	ErrListOrdersByStatusDB = errors.New("failed to get a list of orders by status using db")
 
-	ErrCreateOrderStatusHistoryDB  = errors.New("failed to create order status history using db")
-	ErrMenuItemNotFound            = errors.New("menu item not found")
-	ErrOrderNotFound               = errors.New("order not found")
+	ErrCreateOrderStatusHistoryDB = errors.New("failed to create order status history using db")
+
+	ErrVacancyNotFound             = errors.New("vacancy not found")
 	ErrRestaurantNotFound          = errors.New("restaurant not found")
 	ErrGetRestaurantByApiKeyHashDB = errors.New("failed to get restaurant by api key hash using db")
 	ErrCreateRestaurantDB          = errors.New("failed to create restaurant using db")

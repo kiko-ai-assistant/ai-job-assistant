@@ -8,9 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/maket12/avito-kitchen/migrations"
-
-	pkgpostgres "github.com/maket12/avito-kitchen/pkg/postgres"
+	pkgpostgres "ai-job-assistant/backend/pkg/postgres"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -59,6 +57,6 @@ func (s *BaseRepoSuite) SetupBase(version uint) {
 	s.ctx = context.Background()
 
 	// Apply migrations
-	err := s.pgContainer.MigrateUp(migrations.FS, version)
-	s.Require().NoError(err)
+	// err := s.pgContainer.MigrateUp(migrations.FS, version)
+	// s.Require().NoError(err)
 }

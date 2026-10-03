@@ -8,38 +8,14 @@ import (
 
 	"ai-job-assistant/backend/internal/app/dto"
 	ucerrs "ai-job-assistant/backend/internal/app/errs"
-	"ai-job-assistant/backend/internal/domain/model"
-	"ai-job-assistant/backend/internal/domain/port"
+	"ai-job-assistant/backend/internal/domain/port/mocks"
 	pkgerrs "ai-job-assistant/backend/pkg/errs"
 	pkgutils "ai-job-assistant/backend/pkg/utils"
 
 	"github.com/brianvoe/gofakeit/v7"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
-
-type mockVacancyRepo struct {
-	createFn func(ctx context.Context, vacancy *model.Vacancy) error
-}
-
-func (m *mockVacancyRepo) Create(ctx context.Context, vacancy *model.Vacancy) error {
-	if m.createFn != nil {
-		return m.createFn(ctx, vacancy)
-	}
-	return nil
-}
-
-func (m *mockVacancyRepo) CreateMany(ctx context.Context, vacancies []*model.Vacancy) (port.CreateManyResult, error) {
-	return port.CreateManyResult{}, nil
-}
-
-func (m *mockVacancyRepo) Get(ctx context.Context, id uuid.UUID) (*model.Vacancy, error) {
-	return nil, nil
-}
-
-func (m *mockVacancyRepo) List(ctx context.Context, query port.ListVacanciesQuery) ([]*model.Vacancy, error) {
-	return nil, nil
-}
 
 func fakeValidDescription() string {
 	desc := gofakeit.ProductDescription()
@@ -198,10 +174,9 @@ func TestCreateVacancyUC_Execute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &mockVacancyRepo{
-				createFn: func(ctx context.Context, vacancy *model.Vacancy) error {
-					return tt.repoErr
-				},
+			repo := mocks.NewMockVacancyRepository(t)
+			if !tt.wantErr || tt.repoErr != nil {
+				repo.EXPECT().Create(mock.Anything, mock.Anything).Return(tt.repoErr).Once()
 			}
 
 			uc := NewCreateVacancyUC(repo)
