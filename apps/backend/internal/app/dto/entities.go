@@ -25,10 +25,10 @@ type VacancyDTO struct {
 	Source          string
 	Title           string
 	Company         *string
-	Salary          SalaryDTO
+	Salary          *SalaryDTO
 	Grade           string
 	EmploymentTypes []string
-	Location        LocationDTO
+	Location        *LocationDTO
 	Description     string
 	URL             string
 	PublishedAt     time.Time
