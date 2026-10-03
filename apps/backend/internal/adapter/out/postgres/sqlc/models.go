@@ -189,22 +189,22 @@ type UserVacancy struct {
 }
 
 type Vacancy struct {
-	ID             uuid.UUID
-	ExternalID     string
-	Source         string
-	Title          string
-	Company        pgtype.Text
-	SalaryText     pgtype.Text
-	SalaryFrom     pgtype.Int4
-	SalaryTo       pgtype.Int4
-	Currency       pgtype.Text
-	Grade          Grade
-	EmploymentType []EmploymentType
-	LocationText   pgtype.Text
-	Country        pgtype.Text
-	City           pgtype.Text
-	Description    string
-	Url            string
-	PublishedAt    time.Time
-	ParsedAt       time.Time
+	ID              uuid.UUID
+	ExternalID      string
+	Source          string
+	Title           string
+	Company         pgtype.Text
+	SalaryText      pgtype.Text
+	SalaryFrom      pgtype.Int4
+	SalaryTo        pgtype.Int4
+	Currency        pgtype.Text
+	Grade           Grade
+	EmploymentTypes []EmploymentType
+	LocationText    pgtype.Text
+	Country         pgtype.Text
+	City            pgtype.Text
+	Description     string
+	Url             string
+	PublishedAt     time.Time
+	ParsedAt        time.Time
 }

@@ -197,13 +197,13 @@ func (s *Salary) Currency() *string { return s.currency }
 
 // ================ Business Logic ================
 
-func (s *Salary) HasBounds() bool {
-	return s != nil && (s.from != nil || s.to != nil)
-}
+func (s *Salary) HasText() bool       { return s != nil && s.text != nil }
+func (s *Salary) HasLeftBound() bool  { return s != nil && s.from != nil }
+func (s *Salary) HasRightBound() bool { return s != nil && s.to != nil }
+func (s *Salary) HasCurrency() bool   { return s != nil && s.currency != nil }
 
-func (s *Salary) IsNegotiable() bool {
-	return s != nil && s.from == nil && s.to == nil && s.text != nil
-}
+func (s *Salary) HasBounds() bool    { return s.HasLeftBound() && s.HasRightBound() }
+func (s *Salary) IsNegotiable() bool { return s.HasText() && !s.HasBounds() }
 
 func (s *Salary) Match(salary int, currency string) (bool, error) {
 	if salary < minSalaryVal || salary > maxSalaryVal {
@@ -288,13 +288,9 @@ func (l *Location) City() *string    { return l.city }
 
 // ================ Business Logic ================
 
-func (l *Location) HasCountry() bool {
-	return l != nil && l.country != nil
-}
-
-func (l *Location) HasCity() bool {
-	return l != nil && l.city != nil
-}
+func (l *Location) HasText() bool    { return l != nil && l.text != nil }
+func (l *Location) HasCountry() bool { return l != nil && l.country != nil }
+func (l *Location) HasCity() bool    { return l != nil && l.city != nil }
 
 func (l *Location) Match(country string, city *string) (bool, error) {
 	if !pkgutils.StrWithinRange(country, minLocCountryLen, maxLocCountryLen, true) {
@@ -528,6 +524,10 @@ func (v *Vacancy) FromHH() bool       { return v.source == SourceHH }
 func (v *Vacancy) FromTelegram() bool { return v.source == SourceTelegram }
 func (v *Vacancy) FromOzon() bool     { return v.source == SourceOzon }
 func (v *Vacancy) FromMTS() bool      { return v.source == SourceMTS }
+
+func (v *Vacancy) HasCompany() bool  { return v.company != nil }
+func (v *Vacancy) HasSalary() bool   { return v.salary != nil }
+func (v *Vacancy) HasLocation() bool { return v.location != nil }
 
 func (v *Vacancy) IsExpired() bool {
 	return time.Since(v.publishedAt) > vacancyValidUpTo

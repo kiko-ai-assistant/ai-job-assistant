@@ -5,6 +5,7 @@ import (
 
 	"ai-job-assistant/backend/internal/adapter/out/postgres/sqlc"
 	pkgpostgres "ai-job-assistant/backend/pkg/postgres"
+
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

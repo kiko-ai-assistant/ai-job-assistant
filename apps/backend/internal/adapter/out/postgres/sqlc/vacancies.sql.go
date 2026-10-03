@@ -25,7 +25,7 @@ INSERT INTO vacancies (
     salary_to,
     currency,
     grade,
-    employment_type,
+    employment_types,
     location_text,
     country,
     city,
@@ -40,24 +40,24 @@ INSERT INTO vacancies (
 `
 
 type CreateVacancyParams struct {
-	ID             uuid.UUID
-	ExternalID     string
-	Source         string
-	Title          string
-	Company        pgtype.Text
-	SalaryText     pgtype.Text
-	SalaryFrom     pgtype.Int4
-	SalaryTo       pgtype.Int4
-	Currency       pgtype.Text
-	Grade          Grade
-	EmploymentType []EmploymentType
-	LocationText   pgtype.Text
-	Country        pgtype.Text
-	City           pgtype.Text
-	Description    string
-	Url            string
-	PublishedAt    time.Time
-	ParsedAt       time.Time
+	ID              uuid.UUID
+	ExternalID      string
+	Source          string
+	Title           string
+	Company         pgtype.Text
+	SalaryText      pgtype.Text
+	SalaryFrom      pgtype.Int4
+	SalaryTo        pgtype.Int4
+	Currency        pgtype.Text
+	Grade           Grade
+	EmploymentTypes []EmploymentType
+	LocationText    pgtype.Text
+	Country         pgtype.Text
+	City            pgtype.Text
+	Description     string
+	Url             string
+	PublishedAt     time.Time
+	ParsedAt        time.Time
 }
 
 func (q *Queries) CreateVacancy(ctx context.Context, db DBTX, arg CreateVacancyParams) error {
@@ -72,7 +72,7 @@ func (q *Queries) CreateVacancy(ctx context.Context, db DBTX, arg CreateVacancyP
 		arg.SalaryTo,
 		arg.Currency,
 		arg.Grade,
-		arg.EmploymentType,
+		arg.EmploymentTypes,
 		arg.LocationText,
 		arg.Country,
 		arg.City,
@@ -96,7 +96,7 @@ SELECT
     salary_to,
     currency,
     grade,
-    employment_type,
+    employment_types,
     location_text,
     country,
     city,
@@ -122,7 +122,7 @@ func (q *Queries) GetVacancy(ctx context.Context, db DBTX, id uuid.UUID) (Vacanc
 		&i.SalaryTo,
 		&i.Currency,
 		&i.Grade,
-		&i.EmploymentType,
+		&i.EmploymentTypes,
 		&i.LocationText,
 		&i.Country,
 		&i.City,
@@ -146,7 +146,7 @@ SELECT
     salary_to,
     currency,
     grade,
-    employment_type,
+    employment_types,
     location_text,
     country,
     city,
@@ -178,7 +178,7 @@ func (q *Queries) ListVacancies(ctx context.Context, db DBTX) ([]Vacancy, error)
 			&i.SalaryTo,
 			&i.Currency,
 			&i.Grade,
-			&i.EmploymentType,
+			&i.EmploymentTypes,
 			&i.LocationText,
 			&i.Country,
 			&i.City,

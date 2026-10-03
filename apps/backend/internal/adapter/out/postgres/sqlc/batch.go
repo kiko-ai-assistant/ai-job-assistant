@@ -31,7 +31,7 @@ INSERT INTO vacancies (
     salary_to,
     currency,
     grade,
-    employment_type,
+    employment_types,
     location_text,
     country,
     city,
@@ -54,24 +54,24 @@ type CreateManyVacanciesBatchResults struct {
 }
 
 type CreateManyVacanciesParams struct {
-	ID             uuid.UUID
-	ExternalID     string
-	Source         string
-	Title          string
-	Company        pgtype.Text
-	SalaryText     pgtype.Text
-	SalaryFrom     pgtype.Int4
-	SalaryTo       pgtype.Int4
-	Currency       pgtype.Text
-	Grade          Grade
-	EmploymentType []EmploymentType
-	LocationText   pgtype.Text
-	Country        pgtype.Text
-	City           pgtype.Text
-	Description    string
-	Url            string
-	PublishedAt    time.Time
-	ParsedAt       time.Time
+	ID              uuid.UUID
+	ExternalID      string
+	Source          string
+	Title           string
+	Company         pgtype.Text
+	SalaryText      pgtype.Text
+	SalaryFrom      pgtype.Int4
+	SalaryTo        pgtype.Int4
+	Currency        pgtype.Text
+	Grade           Grade
+	EmploymentTypes []EmploymentType
+	LocationText    pgtype.Text
+	Country         pgtype.Text
+	City            pgtype.Text
+	Description     string
+	Url             string
+	PublishedAt     time.Time
+	ParsedAt        time.Time
 }
 
 func (q *Queries) CreateManyVacancies(ctx context.Context, db DBTX, arg []CreateManyVacanciesParams) *CreateManyVacanciesBatchResults {
@@ -88,7 +88,7 @@ func (q *Queries) CreateManyVacancies(ctx context.Context, db DBTX, arg []Create
 			a.SalaryTo,
 			a.Currency,
 			a.Grade,
-			a.EmploymentType,
+			a.EmploymentTypes,
 			a.LocationText,
 			a.Country,
 			a.City,
