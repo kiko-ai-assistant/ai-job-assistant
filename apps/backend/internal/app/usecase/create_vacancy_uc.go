@@ -20,11 +20,13 @@ func NewCreateVacancyUC(vacancy port.VacancyRepository) *CreateVacancyUC {
 }
 
 func (uc *CreateVacancyUC) Execute(ctx context.Context, in dto.CreateVacancyInput) (*dto.CreateVacancyOutput, error) {
+	// Create vacancy
 	vacancy, err := mapper.ToVacancyDomain(in)
 	if err != nil {
 		return nil, ucerrs.Wrap(ucerrs.ErrInvalidInput, err)
 	}
 
+	// Save it in database
 	err = uc.vacancy.Create(ctx, vacancy)
 	if err != nil {
 		if errors.Is(err, pkgerrs.ErrObjectAlreadyExists) {
@@ -33,5 +35,6 @@ func (uc *CreateVacancyUC) Execute(ctx context.Context, in dto.CreateVacancyInpu
 		return nil, ucerrs.Wrap(ucerrs.ErrCreateVacancyDB, err)
 	}
 
+	// Output
 	return mapper.ToCreateVacancyOutput(vacancy), nil
 }

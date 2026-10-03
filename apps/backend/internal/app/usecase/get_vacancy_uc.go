@@ -22,10 +22,12 @@ func NewGetVacancyUC(vacancy port.VacancyRepository) *GetVacancyUC {
 }
 
 func (uc *GetVacancyUC) Execute(ctx context.Context, in dto.GetVacancyInput) (*dto.GetVacancyOutput, error) {
-	if in.ID == uuid.Nil {
-		return nil, ucerrs.Wrap(ucerrs.ErrInvalidInput, pkgerrs.NewValueRequiredError("id"))
+	// Premier validation
+	if err := uc.validateInput(&in); err != nil {
+		return nil, err
 	}
 
+	// Get the vacancy
 	vacancy, err := uc.vacancy.Get(ctx, in.ID)
 	if err != nil {
 		if errors.Is(err, pkgerrs.ErrObjectNotFound) {
@@ -33,5 +35,17 @@ func (uc *GetVacancyUC) Execute(ctx context.Context, in dto.GetVacancyInput) (*d
 		}
 		return nil, ucerrs.Wrap(ucerrs.ErrGetVacancyDB, err)
 	}
+
+	// Output
 	return mapper.ToGetVacancyOutput(vacancy), nil
+}
+
+func (uc *GetVacancyUC) validateInput(in *dto.GetVacancyInput) error {
+	if in.ID == uuid.Nil {
+		return ucerrs.Wrap(
+			ucerrs.ErrInvalidInput,
+			pkgerrs.NewValueRequiredError("id"),
+		)
+	}
+	return nil
 }
