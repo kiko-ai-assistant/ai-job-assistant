@@ -200,15 +200,15 @@ func TestCreateVacancyUC_Execute(t *testing.T) {
 				assert.Equal(t, tt.input.ParsedAt, out.ParsedAt)
 
 				if tt.input.Salary != nil {
-					assert.Equal(t, *tt.input.Salary, out.Salary)
+					assert.Equal(t, tt.input.Salary, out.Salary)
 				} else {
-					assert.Equal(t, dto.SalaryDTO{}, out.Salary)
+					assert.Nil(t, out.Salary)
 				}
 
 				if tt.input.Location != nil {
-					assert.Equal(t, *tt.input.Location, out.Location)
+					assert.Equal(t, tt.input.Location, out.Location)
 				} else {
-					assert.Equal(t, dto.LocationDTO{}, out.Location)
+					assert.Nil(t, out.Location)
 				}
 			}
 		})

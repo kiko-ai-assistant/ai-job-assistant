@@ -19,7 +19,7 @@ type VacancyHandler struct {
 	getVacancyUC      *usecase.GetVacancyUC
 }
 
-func NewItemHandler(
+func NewVacancyHandler(
 	log *slog.Logger,
 	createVacancyUC *usecase.CreateVacancyUC,
 	insertVacanciesUC *usecase.InsertVacanciesUC,
@@ -34,34 +34,60 @@ func NewItemHandler(
 }
 
 func (h *VacancyHandler) Create(c echo.Context) error {
-	var req httpdto.CreateItemRequest
+	var req httpdto.CreateVacancyRequest
 
 	if err := c.Bind(&req); err != nil {
 		return h.returnErr(c, "binding failed", pkgerrs.ErrInvalidJSON)
 	}
 
-	out, err := h.createItemUC.Execute(
+	out, err := h.createVacancyUC.Execute(
 		c.Request().Context(),
-		mapper.MapRequestToCreateItem(req),
+		mapper.MapRequestToCreateVacancy(req),
 	)
 	if err != nil {
-		return h.returnErr(c, "failed to create item", err)
+		return h.returnErr(c, "failed to create vacancy", err)
 	}
 
 	h.log.InfoContext(
 		c.Request().Context(), "vacancy created",
-		slog.Any("name", req.Name),
-		slog.Any("description", req.Description),
-		slog.Any("category", req.Category),
-		slog.Any("photo_url", req.PhotoURL),
-		slog.Any("nutrition", req.Nutrition),
+		slog.String("id", out.ID.String()),
+		slog.String("external_id", out.ExternalID),
+		slog.Any("source", out.Source),
+		slog.Any("title", out.Title),
+		slog.Any("url", out.URL),
+		slog.Any("published_at", out.PublishedAt),
 	)
 
-	return c.JSON(http.StatusCreated, mapper.MapOutputToCreateItem(out))
+	return c.JSON(http.StatusCreated, mapper.MapOutputToCreateVacancy(out))
+}
+
+func (h *VacancyHandler) Insert(c echo.Context) error {
+	var req httpdto.InsertVacanciesRequest
+
+	if err := c.Bind(&req); err != nil {
+		return h.returnErr(c, "binding failed", pkgerrs.ErrInvalidJSON)
+	}
+
+	out, err := h.insertVacanciesUC.Execute(
+		c.Request().Context(),
+		mapper.MapRequestToInsertVacancies(req),
+	)
+	if err != nil {
+		return h.returnErr(c, "failed to insert vacancies", err)
+	}
+
+	h.log.InfoContext(
+		c.Request().Context(), "vacancies inserted",
+		slog.Int("total", len(req.Vacancies)),
+		slog.Int("inserted", out.Inserted),
+		slog.Int("ignored", out.Ignored),
+	)
+
+	return c.JSON(http.StatusOK, mapper.MapOutputToInsertVacancies(out))
 }
 
 func (h *VacancyHandler) Get(c echo.Context) error {
-	var req httpdto.GetItemRequest
+	var req httpdto.GetVacancyRequest
 
 	err := c.Bind(&req)
 	if err != nil {
@@ -72,15 +98,15 @@ func (h *VacancyHandler) Get(c echo.Context) error {
 		return h.returnErr(c, "failed to parse uuid", pkgerrs.ErrInvalidIdentifier)
 	}
 
-	out, err := h.getItemUC.Execute(
+	out, err := h.getVacancyUC.Execute(
 		c.Request().Context(),
-		mapper.MapRequestToGetItem(req),
+		mapper.MapRequestToGetVacancy(req),
 	)
 	if err != nil {
-		return h.returnErr(c, "failed to get item", err)
+		return h.returnErr(c, "failed to get vacancy", err)
 	}
 
-	return c.JSON(http.StatusOK, mapper.MapOutputToGetItem(out))
+	return c.JSON(http.StatusOK, mapper.MapOutputToGetVacancy(out))
 }
 
 func (h *VacancyHandler) returnErr(c echo.Context, msg string, err error) error {

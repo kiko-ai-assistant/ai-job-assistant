@@ -98,7 +98,7 @@ func TestGetVacancyUC_Execute(t *testing.T) {
 				Source:     model.SourceHH.String(),
 				Title:      fullTitle,
 				Company:    pkgutils.VPtr(fullCompany),
-				Salary: dto.SalaryDTO{
+				Salary: &dto.SalaryDTO{
 					Text:     pkgutils.VPtr("100k - 150k"),
 					From:     pkgutils.VPtr(100000),
 					To:       pkgutils.VPtr(150000),
@@ -106,7 +106,7 @@ func TestGetVacancyUC_Execute(t *testing.T) {
 				},
 				Grade:           model.GradeMiddle.String(),
 				EmploymentTypes: []string{model.EmploymentRemote.String(), model.EmploymentOffice.String()},
-				Location: dto.LocationDTO{
+				Location: &dto.LocationDTO{
 					Text:    pkgutils.VPtr("Moscow"),
 					Country: pkgutils.VPtr("Russia"),
 					City:    pkgutils.VPtr("Moscow"),
@@ -131,10 +131,10 @@ func TestGetVacancyUC_Execute(t *testing.T) {
 				Source:          model.SourceTelegram.String(),
 				Title:           minTitle,
 				Company:         nil,
-				Salary:          dto.SalaryDTO{},
+				Salary:          nil,
 				Grade:           model.GradeSenior.String(),
 				EmploymentTypes: []string{model.EmploymentHybrid.String()},
-				Location:        dto.LocationDTO{},
+				Location:        nil,
 				Description:     minVacancy.Description(),
 				URL:             minVacancy.URL(),
 				PublishedAt:     pubAt,

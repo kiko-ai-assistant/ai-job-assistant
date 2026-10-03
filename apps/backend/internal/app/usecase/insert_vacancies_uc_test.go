@@ -28,7 +28,7 @@ func TestInsertVacanciesUC_Execute(t *testing.T) {
 		Source:     "hh",
 		Title:      fakeValidTitle(),
 		Company:    pkgutils.VPtr(fakeValidCompany()),
-		Salary: dto.SalaryDTO{
+		Salary: &dto.SalaryDTO{
 			Text:     pkgutils.VPtr("100k - 150k"),
 			From:     pkgutils.VPtr(100000),
 			To:       pkgutils.VPtr(150000),
@@ -36,7 +36,7 @@ func TestInsertVacanciesUC_Execute(t *testing.T) {
 		},
 		Grade:           "middle",
 		EmploymentTypes: []string{"remote", "office"},
-		Location: dto.LocationDTO{
+		Location: &dto.LocationDTO{
 			Text:    pkgutils.VPtr("Moscow"),
 			Country: pkgutils.VPtr("Russia"),
 			City:    pkgutils.VPtr("Moscow"),
@@ -52,10 +52,10 @@ func TestInsertVacanciesUC_Execute(t *testing.T) {
 		Source:          "telegram",
 		Title:           fakeValidTitle(),
 		Company:         nil,
-		Salary:          dto.SalaryDTO{},
+		Salary:          nil,
 		Grade:           "senior",
 		EmploymentTypes: []string{"hybrid"},
-		Location:        dto.LocationDTO{},
+		Location:        nil,
 		Description:     fakeValidDescription(),
 		URL:             fakeValidURL(),
 		PublishedAt:     pubAt,
@@ -110,12 +110,6 @@ func TestInsertVacanciesUC_Execute(t *testing.T) {
 				Vacancies: []dto.VacancyDTO{},
 			},
 			mockSetup: func(m *mocks.MockVacancyRepository) {
-				m.EXPECT().CreateMany(mock.Anything, mock.MatchedBy(func(vacs []*model.Vacancy) bool {
-					return len(vacs) == 0
-				})).Return(port.CreateManyResult{
-					Inserted: 0,
-					Ignored:  0,
-				}, nil).Once()
 			},
 			want: &dto.InsertVacanciesOutput{
 				Inserted: 0,
@@ -130,12 +124,6 @@ func TestInsertVacanciesUC_Execute(t *testing.T) {
 				Vacancies: nil,
 			},
 			mockSetup: func(m *mocks.MockVacancyRepository) {
-				m.EXPECT().CreateMany(mock.Anything, mock.MatchedBy(func(vacs []*model.Vacancy) bool {
-					return vacs == nil
-				})).Return(port.CreateManyResult{
-					Inserted: 0,
-					Ignored:  0,
-				}, nil).Once()
 			},
 			want: &dto.InsertVacanciesOutput{
 				Inserted: 0,

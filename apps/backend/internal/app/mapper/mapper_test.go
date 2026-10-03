@@ -317,20 +317,22 @@ func TestToCreateVacancyOutput(t *testing.T) {
 			assert.Equal(t, tt.vac.ParsedAt(), out.ParsedAt)
 
 			if tt.vac.Salary() != nil {
+				assert.NotNil(t, out.Salary)
 				assert.Equal(t, tt.vac.Salary().Text(), out.Salary.Text)
 				assert.Equal(t, tt.vac.Salary().From(), out.Salary.From)
 				assert.Equal(t, tt.vac.Salary().To(), out.Salary.To)
 				assert.Equal(t, tt.vac.Salary().Currency(), out.Salary.Currency)
 			} else {
-				assert.Equal(t, dto.SalaryDTO{}, out.Salary)
+				assert.Nil(t, out.Salary)
 			}
 
 			if tt.vac.Location() != nil {
+				assert.NotNil(t, out.Location)
 				assert.Equal(t, tt.vac.Location().Text(), out.Location.Text)
 				assert.Equal(t, tt.vac.Location().Country(), out.Location.Country)
 				assert.Equal(t, tt.vac.Location().City(), out.Location.City)
 			} else {
-				assert.Equal(t, dto.LocationDTO{}, out.Location)
+				assert.Nil(t, out.Location)
 			}
 
 			if tt.vac.EmploymentTypes() != nil {
@@ -370,7 +372,7 @@ func TestVacancyDTOToDomain(t *testing.T) {
 				Source:     "hh",
 				Title:      validTitle,
 				Company:    pkgutils.VPtr(validCompany),
-				Salary: dto.SalaryDTO{
+				Salary: &dto.SalaryDTO{
 					Text:     pkgutils.VPtr("100k - 150k"),
 					From:     pkgutils.VPtr(100000),
 					To:       pkgutils.VPtr(150000),
@@ -378,7 +380,7 @@ func TestVacancyDTOToDomain(t *testing.T) {
 				},
 				Grade:           "middle",
 				EmploymentTypes: []string{"remote", "office"},
-				Location: dto.LocationDTO{
+				Location: &dto.LocationDTO{
 					Text:    pkgutils.VPtr("Moscow"),
 					Country: pkgutils.VPtr("Russia"),
 					City:    pkgutils.VPtr("Moscow"),
@@ -399,10 +401,10 @@ func TestVacancyDTOToDomain(t *testing.T) {
 				Source:          "telegram",
 				Title:           fakeValidTitle(),
 				Company:         nil,
-				Salary:          dto.SalaryDTO{},
+				Salary:          nil,
 				Grade:           "senior",
 				EmploymentTypes: []string{"hybrid"},
-				Location:        dto.LocationDTO{},
+				Location:        nil,
 				Description:     fakeValidDescription(),
 				URL:             fakeValidURL(),
 				PublishedAt:     pubAt,
@@ -418,7 +420,7 @@ func TestVacancyDTOToDomain(t *testing.T) {
 				Source:     "hh",
 				Title:      validTitle,
 				Company:    pkgutils.VPtr(validCompany),
-				Salary: dto.SalaryDTO{
+				Salary: &dto.SalaryDTO{
 					From:     pkgutils.VPtr(200000),
 					To:       pkgutils.VPtr(100000),
 					Currency: pkgutils.VPtr("RUB"),
@@ -440,12 +442,12 @@ func TestVacancyDTOToDomain(t *testing.T) {
 				Source:     "hh",
 				Title:      validTitle,
 				Company:    pkgutils.VPtr(validCompany),
-				Salary:     dto.SalaryDTO{},
+				Salary:     nil,
 				Grade:      "middle",
 				EmploymentTypes: []string{
 					"remote",
 				},
-				Location: dto.LocationDTO{
+				Location: &dto.LocationDTO{
 					City: pkgutils.VPtr("Moscow"),
 				},
 				Description: validDesc,
@@ -463,7 +465,7 @@ func TestVacancyDTOToDomain(t *testing.T) {
 				Source:          "hh",
 				Title:           "",
 				Company:         pkgutils.VPtr(validCompany),
-				Salary:          dto.SalaryDTO{},
+				Salary:          nil,
 				Grade:           "middle",
 				EmploymentTypes: []string{"remote"},
 				Description:     validDesc,
@@ -718,20 +720,22 @@ func TestToGetVacancyOutput(t *testing.T) {
 			assert.Equal(t, tt.vac.ParsedAt(), out.ParsedAt)
 
 			if tt.vac.Salary() != nil {
+				assert.NotNil(t, out.Salary)
 				assert.Equal(t, tt.vac.Salary().Text(), out.Salary.Text)
 				assert.Equal(t, tt.vac.Salary().From(), out.Salary.From)
 				assert.Equal(t, tt.vac.Salary().To(), out.Salary.To)
 				assert.Equal(t, tt.vac.Salary().Currency(), out.Salary.Currency)
 			} else {
-				assert.Equal(t, dto.SalaryDTO{}, out.Salary)
+				assert.Nil(t, out.Salary)
 			}
 
 			if tt.vac.Location() != nil {
+				assert.NotNil(t, out.Location)
 				assert.Equal(t, tt.vac.Location().Text(), out.Location.Text)
 				assert.Equal(t, tt.vac.Location().Country(), out.Location.Country)
 				assert.Equal(t, tt.vac.Location().City(), out.Location.City)
 			} else {
-				assert.Equal(t, dto.LocationDTO{}, out.Location)
+				assert.Nil(t, out.Location)
 			}
 		})
 	}

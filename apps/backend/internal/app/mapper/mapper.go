@@ -13,11 +13,11 @@ func toSalaryDomain(d *dto.SalaryDTO) (*model.Salary, error) {
 	return model.NewSalary(d.Text, d.From, d.To, d.Currency)
 }
 
-func toSalaryDTO(s *model.Salary) dto.SalaryDTO {
+func toSalaryDTO(s *model.Salary) *dto.SalaryDTO {
 	if s == nil {
-		return dto.SalaryDTO{}
+		return nil
 	}
-	return dto.SalaryDTO{
+	return &dto.SalaryDTO{
 		Text:     s.Text(),
 		From:     s.From(),
 		To:       s.To(),
@@ -32,11 +32,11 @@ func toLocationDomain(d *dto.LocationDTO) (*model.Location, error) {
 	return model.NewLocation(d.Text, d.Country, d.City)
 }
 
-func toLocationDTO(l *model.Location) dto.LocationDTO {
+func toLocationDTO(l *model.Location) *dto.LocationDTO {
 	if l == nil {
-		return dto.LocationDTO{}
+		return nil
 	}
-	return dto.LocationDTO{
+	return &dto.LocationDTO{
 		Text:    l.Text(),
 		Country: l.Country(),
 		City:    l.City(),
@@ -82,12 +82,12 @@ func ToVacancyDomain(in dto.CreateVacancyInput) (*model.Vacancy, error) {
 }
 
 func VacancyDTOToDomain(d dto.VacancyDTO) (*model.Vacancy, error) {
-	salary, err := toSalaryDomain(&d.Salary)
+	salary, err := toSalaryDomain(d.Salary)
 	if err != nil {
 		return nil, err
 	}
 
-	location, err := toLocationDomain(&d.Location)
+	location, err := toLocationDomain(d.Location)
 	if err != nil {
 		return nil, err
 	}

@@ -12,17 +12,12 @@ import (
 )
 
 type Router struct {
-	Public  *PublicHandler
-	Partner *PartnerHandler
+	Vacancy *VacancyHandler
 }
 
-func NewRouter(
-	public *PublicHandler,
-	partner *PartnerHandler,
-) *Router {
+func NewRouter(vacancy *VacancyHandler) *Router {
 	return &Router{
-		Public:  public,
-		Partner: partner,
+		Vacancy: vacancy,
 	}
 }
 
@@ -143,49 +138,11 @@ func (r *Router) InitRoutes() *echo.Echo {
 	// --- PUBLIC API (/api/v1) ---
 	v1 := router.Group("/api/v1")
 	{
-		restaurants := v1.Group("/restaurants")
+		vacancies := v1.Group("/vacancies")
 		{
-			restaurants.GET("", r.Public.ListActiveRestaurants)
-			restaurants.GET("/:restaurantId/menu", r.Public.GetMenu)
-		}
-
-		orders := v1.Group("/orders")
-		{
-			orders.POST("", r.Public.CreateOrder)
-			orders.GET("/:orderId", r.Public.GetOrder)
-		}
-
-		customers := v1.Group("/customers")
-		{
-			customers.GET("/:customerRef/orders", r.Public.ListCustomerOrders)
-		}
-	}
-
-	// --- PARTNER API (/partner/v1) ---
-	partner := router.Group("/partner/v1")
-	{
-		partner.POST("/register", r.Partner.RegisterRestaurant)
-
-		categories := partner.Group("/categories")
-		{
-			categories.GET("", r.Partner.ListCategories)
-			categories.POST("", r.Partner.CreateCategory)
-		}
-
-		partner.GET("/menu", r.Partner.ListMenuItems)
-
-		menuItems := partner.Group("/menu/items")
-		{
-			menuItems.POST("", r.Partner.CreateMenuItem)
-			menuItems.PATCH("/:itemId", r.Partner.UpdateMenuItem)
-		}
-
-		orders := partner.Group("/orders")
-		{
-			orders.GET("", r.Partner.ListOrders)
-			orders.POST("/:orderId/accept", r.Partner.AcceptOrder)
-			orders.POST("/:orderId/reject", r.Partner.RejectOrder)
-			orders.PATCH("/:orderId/status", r.Partner.UpdateOrderStatus)
+			vacancies.POST("", r.Vacancy.Create)
+			vacancies.POST("/batch", r.Vacancy.Insert)
+			vacancies.GET("/:id", r.Vacancy.Get)
 		}
 	}
 
