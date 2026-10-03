@@ -7,6 +7,7 @@ package sqlc
 import (
 	"database/sql/driver"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -204,6 +205,6 @@ type Vacancy struct {
 	City           pgtype.Text
 	Description    string
 	Url            string
-	PublishedAt    pgtype.Timestamptz
-	ParsedAt       pgtype.Timestamptz
+	PublishedAt    time.Time
+	ParsedAt       time.Time
 }

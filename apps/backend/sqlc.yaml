@@ -14,3 +14,7 @@ sql:
         overrides:
           - db_type: "uuid"
             go_type: "github.com/google/uuid.UUID"
+          - column: "vacancies.published_at"
+            go_type: "time.Time"
+          - column: "vacancies.parsed_at"
+            go_type: "time.Time"

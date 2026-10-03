@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -55,8 +56,8 @@ type CreateVacancyParams struct {
 	City           pgtype.Text
 	Description    string
 	Url            string
-	PublishedAt    pgtype.Timestamptz
-	ParsedAt       pgtype.Timestamptz
+	PublishedAt    time.Time
+	ParsedAt       time.Time
 }
 
 func (q *Queries) CreateVacancy(ctx context.Context, db DBTX, arg CreateVacancyParams) error {
