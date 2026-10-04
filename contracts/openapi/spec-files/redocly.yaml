@@ -1,0 +1,14 @@
+extends:
+  - recommended
+
+rules:
+  # Strict: these must never regress (CI fails on them)
+  operation-operationId: error
+  operation-4xx-response: error
+  no-ambiguous-paths: error
+  no-unused-components: error
+  no-invalid-media-type-examples: error
+
+  # Not applicable for an internal contract that is not published yet
+  info-license: off
+  no-server-example.com: off

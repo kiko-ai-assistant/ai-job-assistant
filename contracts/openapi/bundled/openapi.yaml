@@ -1,0 +1,1766 @@
+openapi: 3.0.3
+info:
+  title: Kiko API Contracts
+  version: 1.2.0
+  description: |-
+    Central REST API of the Kiko Core Backend (Go). One API, four kinds of clients,
+    each with its own credentials:
+
+    | Client | Credentials | Used for |
+    |---|---|---|
+    | Website (JS) | `BearerAuth` — JWT from `POST /auth/telegram` | the logged-in user's own data |
+    | Telegram bot (Python) | `BotApiKey` + `TelegramUserId` (`X-Telegram-Id`) | acting on behalf of a Telegram user |
+    | Vacancy parser | `ParserApiKey` | ingesting vacancies |
+    | AI matching worker | `AiWorkerApiKey` | `/internal/matching/*` |
+
+    **Ownership rule.** Every `/users/{id}/**` operation is owner-only: the user
+    resolved from the JWT `sub` (website) or from `X-Telegram-Id` (bot) must equal
+    `{id}`, otherwise the API answers `403 permission_denied`.
+
+    **Errors.** All errors share one envelope (`error.code`, `error.message`,
+    `error.details[]`, `error.request_id`) — see `errors.yaml`.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+security:
+  - BearerAuth: []
+  - BotApiKey: []
+    TelegramUserId: []
+tags:
+  - name: System
+    description: Health check
+  - name: Auth
+    description: Website sign-in via Telegram Login Widget
+  - name: Users
+    description: User profiles and lookups
+  - name: User Settings
+    description: Search preferences (owner-only)
+  - name: CV
+    description: User CV (owner-only)
+  - name: Vacancies
+    description: Public vacancy catalog and parser ingestion
+  - name: Recommendations
+    description: Personalized vacancies, scores and cover letters (owner-only)
+  - name: Internal AI
+    description: Endpoints for the AI matching worker
+paths:
+  /health:
+    get:
+      tags:
+        - System
+      operationId: healthCheck
+      summary: Health check
+      description: Returns the health of the backend and its database connection.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/telegram:
+    post:
+      tags:
+        - Auth
+      operationId: authenticateWithTelegram
+      summary: Sign in with Telegram Login Widget (website)
+      description: Exchanges Telegram Login Widget data for a Kiko access token. The server MUST verify `hash` (HMAC-SHA256 of the data-check-string, keyed with the SHA-256 of the bot token) and reject a stale `auth_date`. The user is created on first sign-in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramLoginData'
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users:
+    post:
+      tags:
+        - Users
+      operationId: upsertUser
+      summary: Register or sync user (bot)
+      description: Creates a user or returns the existing one (upsert on telegram_id). Called by the bot on `/start`. The website does not use this — it registers through `POST /auth/telegram`.
+      security:
+        - BotApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrUpdateUserRequest'
+      responses:
+        '200':
+          description: Existing user returned or updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/lookup:
+    get:
+      tags:
+        - Users
+      operationId: lookupUser
+      summary: Find a user by Telegram ID or username (bot)
+      description: 'Pass exactly one of `telegram_id` or `username` (400 otherwise). `username` matching is case-insensitive; it is nullable in the DB but unique among non-null values (migration 0006), so at most one user matches. Bot-only: a username is public and guessable, so this endpoint must not be open to end users.'
+      security:
+        - BotApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/LookupTelegramId'
+        - $ref: '#/components/parameters/LookupUsername'
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      operationId: getUser
+      summary: Get user by ID
+      description: Owner-only.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags:
+        - Users
+      operationId: patchUser
+      summary: Update user profile
+      description: Owner-only. Changing `username` to one already in use returns 409.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/{id}/settings:
+    get:
+      tags:
+        - User Settings
+      operationId: getUserSettings
+      summary: Get user search settings
+      description: Owner-only.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Settings found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - User Settings
+      operationId: upsertUserSettings
+      summary: Create or update user search settings
+      description: Owner-only.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertUserSettingsRequest'
+      responses:
+        '200':
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/{id}/cv:
+    get:
+      tags:
+        - CV
+      operationId: getUserCV
+      summary: Get CV metadata
+      description: Owner-only. Returns metadata only; use `/cv/download` for the file itself.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: CV found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CV'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - CV
+      operationId: upsertUserCV
+      summary: Attach or replace the CV
+      description: 'Owner-only. Two ways in, both server-controlled — the client never chooses a storage path: the bot sends JSON with a Telegram `cv_file_id` (the server downloads the file from Telegram), the website uploads the file as multipart.'
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertCVRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadCVRequest'
+            encoding:
+              file:
+                contentType: application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      responses:
+        '200':
+          description: CV saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CV'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - CV
+      operationId: deleteUserCV
+      summary: Delete the CV
+      description: Owner-only.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204':
+          description: CV deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/{id}/cv/download:
+    get:
+      tags:
+        - CV
+      operationId: downloadUserCV
+      summary: Download the CV file
+      description: Owner-only. Streams the stored CV file (PDF/DOCX). This is the most sensitive endpoint of the API (a raw personal document), so the ownership check is mandatory.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: CV file content
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /vacancies:
+    get:
+      tags:
+        - Vacancies
+      operationId: listVacancies
+      summary: List catalog vacancies
+      description: Public read-only catalog; contains no user-specific data.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/VacancySource'
+        - $ref: '#/components/parameters/VacancyCompany'
+        - $ref: '#/components/parameters/VacancyLocation'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: A page of vacancies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VacancyPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags:
+        - Vacancies
+      operationId: createVacancy
+      summary: Ingest a single vacancy (parser)
+      security:
+        - ParserApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVacancyRequest'
+      responses:
+        '201':
+          description: Vacancy ingested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vacancy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /vacancies/batch:
+    post:
+      tags:
+        - Vacancies
+      operationId: batchCreateVacancies
+      summary: Batch-ingest vacancies (parser)
+      description: Preferred endpoint for parsers. Duplicates (by source + external_id) are skipped silently and counted in `ignored`, so this never returns 409.
+      security:
+        - ParserApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchCreateVacanciesRequest'
+      responses:
+        '200':
+          description: Batch ingestion result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchIngestVacanciesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /vacancies/{id}:
+    get:
+      tags:
+        - Vacancies
+      operationId: getVacancy
+      summary: Get vacancy by ID
+      description: Public read-only; contains no user-specific data.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/VacancyId'
+      responses:
+        '200':
+          description: Vacancy found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vacancy'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/{id}/recommendations:
+    get:
+      tags:
+        - Recommendations
+      operationId: listUserRecommendations
+      summary: List personalized recommendations
+      description: Owner-only. Scored vacancies with match score and AI summary.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/MinScore'
+        - $ref: '#/components/parameters/IsSeen'
+        - $ref: '#/components/parameters/IsFavorite'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: A page of recommendations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/{id}/recommendations/{vacancy_id}:
+    get:
+      tags:
+        - Recommendations
+      operationId: getUserRecommendation
+      summary: Get one recommendation
+      description: Owner-only.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RecommendationVacancyId'
+      responses:
+        '200':
+          description: Recommendation found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserVacancyWithDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags:
+        - Recommendations
+      operationId: patchUserRecommendation
+      summary: Mark as seen / favorite
+      description: Owner-only.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RecommendationVacancyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchUserVacancyRequest'
+      responses:
+        '200':
+          description: Recommendation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserVacancy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/{id}/recommendations/{vacancy_id}/cover-letter:
+    post:
+      tags:
+        - Recommendations
+      operationId: generateCoverLetter
+      summary: Generate an AI cover letter
+      description: Owner-only. Generates a cover letter from the user's profile, CV and the vacancy, and stores it in user_vacancies.cover_letter. Expensive, hence the rate limit.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RecommendationVacancyId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateCoverLetterRequest'
+      responses:
+        '200':
+          description: Cover letter generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoverLetterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /internal/matching/pending-tasks:
+    get:
+      tags:
+        - Internal AI
+      operationId: listPendingMatchingTasks
+      summary: Get unscored user–vacancy pairs
+      description: Users and freshly ingested vacancies waiting for AI analysis.
+      security:
+        - AiWorkerApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/PendingTasksLimit'
+      responses:
+        '200':
+          description: Pending matching tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MatchingTask'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /internal/matching/results:
+    post:
+      tags:
+        - Internal AI
+      operationId: saveMatchingResults
+      summary: Save a batch of match results
+      description: The AI worker submits computed match scores and summaries.
+      security:
+        - AiWorkerApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchSaveMatchResultsRequest'
+      responses:
+        '200':
+          description: Results saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchSaveMatchResultsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Website. Access token (JWT, `sub` = users.id) obtained from `POST /auth/telegram` after a Telegram Login Widget sign-in. When it expires the API answers 401 `token_expired` and the user signs in again.
+    BotApiKey:
+      type: apiKey
+      in: header
+      name: X-Bot-Api-Key
+      description: Telegram bot backend. Identifies the bot itself as a trusted service. For user-scoped operations it MUST be sent together with `X-Telegram-Id` (see TelegramUserId).
+    TelegramUserId:
+      type: apiKey
+      in: header
+      name: X-Telegram-Id
+      description: Telegram ID of the user the bot is acting for. The server maps it to users.id and applies the ownership rule. Never accepted on its own — the header is trivially forgeable, so it only counts together with a valid `X-Bot-Api-Key`.
+    ParserApiKey:
+      type: apiKey
+      in: header
+      name: X-Parser-Api-Key
+      description: Vacancy parser service. Grants access to vacancy ingestion only.
+    AiWorkerApiKey:
+      type: apiKey
+      in: header
+      name: X-Worker-Api-Key
+      description: AI matching worker. Grants access to `/internal/matching/*` only. Those routes should additionally be unreachable from the public network.
+  schemas:
+    HealthStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: ok
+        db:
+          type: string
+          description: Database connectivity status.
+          example: ok
+          nullable: true
+    ErrorCode:
+      type: string
+      description: |-
+        Stable machine-readable error code. Clients should branch on this value, not on `message` (which is human-readable and may change).
+
+        | code | HTTP | meaning |
+        |---|---|---|
+        | `invalid_request` | 400 | Malformed JSON, wrong type, bad query/path parameter |
+        | `unauthenticated` | 401 | Credentials missing or invalid |
+        | `token_expired` | 401 | Bearer token expired — log in again |
+        | `permission_denied` | 403 | Valid credentials, but not the owner of the resource |
+        | `not_found` | 404 | Resource does not exist |
+        | `conflict` | 409 | Violates a uniqueness constraint |
+        | `payload_too_large` | 413 | Uploaded file exceeds the size limit |
+        | `unsupported_media_type` | 415 | Unsupported request content type or file format |
+        | `validation_failed` | 422 | Well-formed request that breaks a business rule |
+        | `rate_limited` | 429 | Too many requests |
+        | `internal_error` | 500 | Unexpected server error |
+      enum:
+        - invalid_request
+        - unauthenticated
+        - token_expired
+        - permission_denied
+        - not_found
+        - conflict
+        - payload_too_large
+        - unsupported_media_type
+        - validation_failed
+        - rate_limited
+        - internal_error
+      example: validation_failed
+    ErrorDetail:
+      type: object
+      description: A problem with one specific field or parameter.
+      required:
+        - message
+      properties:
+        location:
+          type: string
+          description: Where the offending value was found.
+          enum:
+            - body
+            - query
+            - path
+            - header
+          example: body
+        field:
+          type: string
+          description: Name of the field/parameter (dot notation for nested fields).
+          example: match_score
+        reason:
+          type: string
+          description: Short machine-readable reason, e.g. `required`, `out_of_range`, `invalid_enum`, `already_exists`, `malformed`, `not_found`.
+          example: out_of_range
+        message:
+          type: string
+          description: Human-readable explanation.
+          example: match_score must be between 0 and 100
+    ErrorBody:
+      type: object
+      required:
+        - code
+        - message
+        - request_id
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          description: Human-readable summary of what went wrong.
+          example: The request failed validation.
+        details:
+          type: array
+          description: Per-field problems. Present for 400/409/422 and for lookups by parameter.
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+        request_id:
+          type: string
+          description: Same value as the `X-Request-Id` response header.
+          example: req_7f3a9c1e2b
+    ErrorResponse:
+      type: object
+      description: Envelope used by every error response of the API.
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+    TelegramLoginData:
+      type: object
+      description: Payload returned by the Telegram Login Widget. Field names are dictated by Telegram; the server verifies `hash` against the bot token.
+      required:
+        - id
+        - first_name
+        - auth_date
+        - hash
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Telegram user ID (becomes users.telegram_id).
+          example: 123456789
+        first_name:
+          type: string
+          example: John
+        last_name:
+          type: string
+          example: Doe
+        username:
+          type: string
+          example: johndoe
+        photo_url:
+          type: string
+          example: https://t.me/i/userpic/320/johndoe.jpg
+        auth_date:
+          type: integer
+          format: int64
+          description: Unix time of the Telegram authorization. Stale values are rejected.
+          example: 1790564439
+        hash:
+          type: string
+          description: HMAC-SHA256 signature of the data-check-string.
+          example: a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90
+    InterfaceLang:
+      type: string
+      description: Matches `interface_lang` Postgres enum (migration 0001).
+      enum:
+        - EN
+        - RU
+        - CN
+      example: EN
+    User:
+      type: object
+      required:
+        - id
+        - telegram_id
+        - first_name
+        - language
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        telegram_id:
+          type: integer
+          format: int64
+          description: Unique Telegram numeric ID (BIGINT UNIQUE NOT NULL in DB).
+          example: 123456789
+        username:
+          type: string
+          nullable: true
+          example: johndoe
+        first_name:
+          type: string
+          example: John
+        last_name:
+          type: string
+          nullable: true
+          example: Doe
+        language:
+          allOf:
+            - $ref: '#/components/schemas/InterfaceLang'
+          description: Defaults to EN at DB level.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AuthTokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+        - expires_in
+        - user
+      properties:
+        access_token:
+          type: string
+          description: 'JWT with `sub` = users.id. Send as `Authorization: Bearer <token>`.'
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          enum:
+            - Bearer
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Token lifetime in seconds.
+          example: 3600
+        user:
+          $ref: '#/components/schemas/User'
+    CreateOrUpdateUserRequest:
+      type: object
+      required:
+        - telegram_id
+        - first_name
+      properties:
+        telegram_id:
+          type: integer
+          format: int64
+          example: 123456789
+        username:
+          type: string
+          example: johndoe
+        first_name:
+          type: string
+          example: John
+        last_name:
+          type: string
+          example: Doe
+        language:
+          $ref: '#/components/schemas/InterfaceLang'
+    PatchUserRequest:
+      type: object
+      description: All fields optional; only provided fields are updated.
+      properties:
+        username:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        language:
+          $ref: '#/components/schemas/InterfaceLang'
+    Grade:
+      type: string
+      description: Matches `grade` Postgres enum (migration 0003).
+      enum:
+        - INTERN
+        - JUNIOR
+        - MIDDLE
+        - SENIOR
+        - LEAD
+      example: MIDDLE
+    EmploymentType:
+      type: string
+      description: Matches `employment_type` Postgres enum (migration 0003).
+      enum:
+        - REMOTE
+        - OFFICE
+        - HYBRID
+        - CONTRACT
+      example: REMOTE
+    UserSettings:
+      type: object
+      required:
+        - id
+        - user_id
+        - skills
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        skills:
+          type: array
+          description: Stored as jsonb, defaults to empty array at DB level.
+          items:
+            type: string
+          example:
+            - Go
+            - PostgreSQL
+            - Docker
+        grade:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/Grade'
+          nullable: true
+        employment_type:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/EmploymentType'
+          nullable: true
+        location:
+          type: string
+          nullable: true
+          example: Moscow, Russia
+        updated_at:
+          type: string
+          format: date-time
+    UpsertUserSettingsRequest:
+      type: object
+      properties:
+        skills:
+          type: array
+          items:
+            type: string
+          example:
+            - Go
+            - Kubernetes
+            - PostgreSQL
+        grade:
+          $ref: '#/components/schemas/Grade'
+        employment_type:
+          $ref: '#/components/schemas/EmploymentType'
+        location:
+          type: string
+          example: Remote
+    CV:
+      type: object
+      description: Metadata of the user's CV. The file itself is fetched with GET /users/{id}/cv/download. The DB does not persist extracted CV text — text extraction (see MatchingTask.cv_text) happens on read.
+      required:
+        - id
+        - user_id
+        - cv_file_id
+        - cv_path
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          description: One CV per user (UNIQUE constraint on user_id).
+          example: 1
+        cv_file_id:
+          type: string
+          description: Telegram file_id for CVs sent through the bot; a server-generated identifier for CVs uploaded through the website.
+          example: AgACAgIAAxkBAAI...
+        cv_path:
+          type: string
+          readOnly: true
+          description: Server-side storage key. Generated by the server and never accepted from clients (a client-controlled path would allow reading arbitrary files through /cv/download).
+          example: /storage/cvs/user_1_resume.pdf
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpsertCVRequest:
+      type: object
+      description: 'Used by the Telegram bot: the server downloads the file from Telegram by `cv_file_id`, stores it and generates `cv_path` itself.'
+      required:
+        - cv_file_id
+      properties:
+        cv_file_id:
+          type: string
+          example: BAACAgIAAxkBA...
+    UploadCVRequest:
+      type: object
+      description: 'Used by the website: direct file upload (multipart/form-data).'
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: CV file, PDF or DOCX. The size limit is enforced by the server (413).
+    PageMeta:
+      type: object
+      required:
+        - total
+        - limit
+        - offset
+      properties:
+        total:
+          type: integer
+          description: Total number of items matching the filters (ignoring limit/offset).
+          example: 137
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 0
+    Vacancy:
+      type: object
+      required:
+        - id
+        - external_id
+        - source
+        - title
+        - url
+        - created_at
+        - parsed_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 101
+        external_id:
+          type: string
+          description: ID of the vacancy at the source platform. Unique together with `source`.
+          example: '12345678'
+        source:
+          type: string
+          example: HH.ru
+        title:
+          type: string
+          example: Junior Golang Developer
+        company:
+          type: string
+          nullable: true
+          example: Acme Corp
+        salary_text:
+          type: string
+          nullable: true
+          example: 150 000 - 200 000 RUB
+        location:
+          type: string
+          nullable: true
+          example: Moscow / Remote
+        description:
+          type: string
+          nullable: true
+          example: Требуется Go разработчик с опытом...
+        url:
+          type: string
+          example: https://hh.ru/vacancy/12345678
+        created_at:
+          type: string
+          format: date-time
+        parsed_at:
+          type: string
+          format: date-time
+    VacancyPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - items
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Vacancy'
+    CreateVacancyRequest:
+      type: object
+      required:
+        - external_id
+        - source
+        - title
+        - url
+      properties:
+        external_id:
+          type: string
+          example: '12345678'
+        source:
+          type: string
+          example: HH.ru
+        title:
+          type: string
+          example: Go Developer
+        company:
+          type: string
+          example: Acme Corp
+        salary_text:
+          type: string
+          example: до 250 000 руб.
+        location:
+          type: string
+          example: Remote
+        description:
+          type: string
+          example: Описание вакансии...
+        url:
+          type: string
+          example: https://hh.ru/vacancy/12345678
+    BatchCreateVacanciesRequest:
+      type: object
+      required:
+        - vacancies
+      properties:
+        vacancies:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateVacancyRequest'
+    BatchIngestVacanciesResponse:
+      type: object
+      required:
+        - inserted
+        - ignored
+      properties:
+        inserted:
+          type: integer
+          example: 25
+        ignored:
+          type: integer
+          description: Count of duplicates skipped due to (source, external_id) uniqueness.
+          example: 3
+    UserVacancy:
+      type: object
+      required:
+        - id
+        - user_id
+        - vacancy_id
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        vacancy_id:
+          type: integer
+          format: int64
+          example: 101
+        match_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: NULL until the AI worker scores this pair. DB enforces CHECK (0-100).
+          example: 85
+        ai_summary:
+          type: string
+          nullable: true
+          example: Вакансия отлично подходит по стеку Go и Docker, компания предлагает удаленку.
+        cover_letter:
+          type: string
+          nullable: true
+          example: Здравствуйте! Меня заинтересовала позиция Go разработчика...
+        is_seen:
+          type: boolean
+          nullable: true
+          description: NULL/false until the user opens the recommendation. No DB default.
+          example: false
+        is_favorite:
+          type: boolean
+          nullable: true
+          description: NULL/false until the user favorites the recommendation. No DB default.
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UserVacancyWithDetails:
+      allOf:
+        - $ref: '#/components/schemas/UserVacancy'
+        - type: object
+          properties:
+            vacancy:
+              $ref: '#/components/schemas/Vacancy'
+    RecommendationPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - items
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserVacancyWithDetails'
+    PatchUserVacancyRequest:
+      type: object
+      properties:
+        is_seen:
+          type: boolean
+          example: true
+        is_favorite:
+          type: boolean
+          example: true
+    GenerateCoverLetterRequest:
+      type: object
+      properties:
+        prompt_override:
+          type: string
+          description: Optional specific focus for cover letter generation.
+          example: Сделай упор на мой опыт работы с PostgreSQL и highload
+    CoverLetterResponse:
+      type: object
+      required:
+        - cover_letter
+      properties:
+        cover_letter:
+          type: string
+          example: Здравствуйте! Увидел вакансию в Acme Corp...
+    MatchingTask:
+      type: object
+      required:
+        - user_id
+        - vacancy_id
+        - user_settings
+        - vacancy
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        vacancy_id:
+          type: integer
+          format: int64
+        user_settings:
+          $ref: '#/components/schemas/UserSettings'
+        cv_text:
+          type: string
+          nullable: true
+          description: Extracted CV text, computed on the fly from the file at cv_path (not a persisted DB column). Null if the user has no CV.
+        vacancy:
+          $ref: '#/components/schemas/Vacancy'
+    SaveMatchResultRequest:
+      type: object
+      required:
+        - user_id
+        - vacancy_id
+        - match_score
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        vacancy_id:
+          type: integer
+          format: int64
+        match_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 85
+        ai_summary:
+          type: string
+          example: Отличное совпадение по языку Go и опыту с базами данных.
+    BatchSaveMatchResultsRequest:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SaveMatchResultRequest'
+    BatchSaveMatchResultsResponse:
+      type: object
+      required:
+        - saved_count
+      properties:
+        saved_count:
+          type: integer
+          example: 50
+  headers:
+    RequestId:
+      description: Unique ID of the request. The same value is returned in `error.request_id`. Quote it when reporting a problem.
+      schema:
+        type: string
+        example: req_7f3a9c1e2b
+    RetryAfter:
+      description: Number of seconds to wait before retrying the request.
+      schema:
+        type: integer
+        minimum: 1
+        example: 30
+    WwwAuthenticate:
+      description: Authentication challenge, as required by RFC 9110 for 401 responses.
+      schema:
+        type: string
+        example: Bearer realm="kiko", error="invalid_token"
+  responses:
+    TooManyRequests:
+      description: Rate limit exceeded. Retry after the delay given in `Retry-After`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: rate_limited
+              message: Too many requests. Please retry later.
+              request_id: req_7f3a9c1e2b
+    BadRequest:
+      description: 'The request is malformed: invalid JSON, wrong field type, or an invalid query/path parameter. Business-rule violations use 422 instead.'
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            malformed_json:
+              summary: Request body is not valid JSON
+              value:
+                error:
+                  code: invalid_request
+                  message: The request body is not valid JSON.
+                  request_id: req_7f3a9c1e2b
+            invalid_query_param:
+              summary: Query parameter out of bounds
+              value:
+                error:
+                  code: invalid_request
+                  message: One or more parameters are invalid.
+                  details:
+                    - location: query
+                      field: limit
+                      reason: out_of_range
+                      message: limit must be between 1 and 100
+                  request_id: req_7f3a9c1e2b
+    Unauthorized:
+      description: Credentials are missing, invalid or expired. Which credentials are expected depends on the operation (see `security`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WwwAuthenticate'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_credentials:
+              summary: No credentials supplied
+              value:
+                error:
+                  code: unauthenticated
+                  message: Authentication is required to access this resource.
+                  request_id: req_7f3a9c1e2b
+            invalid_credentials:
+              summary: Wrong API key or malformed token
+              value:
+                error:
+                  code: unauthenticated
+                  message: The supplied credentials are invalid.
+                  details:
+                    - location: header
+                      field: Authorization
+                      reason: malformed
+                      message: Bearer token could not be verified.
+                  request_id: req_7f3a9c1e2b
+            token_expired:
+              summary: Bearer token has expired
+              value:
+                error:
+                  code: token_expired
+                  message: The access token has expired. Log in again via POST /auth/telegram.
+                  request_id: req_7f3a9c1e2b
+    Conflict:
+      description: 'The request violates a uniqueness constraint: a duplicate (source, external_id) pair for vacancies, or an already taken `username` for users.'
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            username_taken:
+              summary: Username already belongs to another user
+              value:
+                error:
+                  code: conflict
+                  message: This username is already taken.
+                  details:
+                    - location: body
+                      field: username
+                      reason: already_exists
+                      message: username "johndoe" is used by another user.
+                  request_id: req_7f3a9c1e2b
+            vacancy_duplicate:
+              summary: Vacancy already ingested
+              value:
+                error:
+                  code: conflict
+                  message: A vacancy with this source and external_id already exists.
+                  details:
+                    - location: body
+                      field: external_id
+                      reason: already_exists
+                      message: HH.ru / 12345678 already exists.
+                  request_id: req_7f3a9c1e2b
+    InternalServerError:
+      description: Unexpected server error. The body never contains internal details — report the `request_id` to the backend team.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: internal_error
+              message: An unexpected error occurred. Please retry later.
+              request_id: req_7f3a9c1e2b
+    UnprocessableEntity:
+      description: The request is well-formed but breaks a business rule, e.g. `match_score` outside 0-100 (DB CHECK constraint) or an unknown enum value.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            score_out_of_range:
+              summary: match_score outside 0-100
+              value:
+                error:
+                  code: validation_failed
+                  message: The request failed validation.
+                  details:
+                    - location: body
+                      field: results.3.match_score
+                      reason: out_of_range
+                      message: match_score must be between 0 and 100
+                  request_id: req_7f3a9c1e2b
+            invalid_enum:
+              summary: Unknown enum value
+              value:
+                error:
+                  code: validation_failed
+                  message: The request failed validation.
+                  details:
+                    - location: body
+                      field: grade
+                      reason: invalid_enum
+                      message: 'grade must be one of: INTERN, JUNIOR, MIDDLE, SENIOR, LEAD'
+                  request_id: req_7f3a9c1e2b
+    NotFound:
+      description: The requested resource does not exist.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            user_not_found:
+              summary: User not found
+              value:
+                error:
+                  code: not_found
+                  message: User not found.
+                  details:
+                    - location: path
+                      field: id
+                      reason: not_found
+                      message: User with id 42 does not exist.
+                  request_id: req_7f3a9c1e2b
+            cv_not_found:
+              summary: User has no CV
+              value:
+                error:
+                  code: not_found
+                  message: The user has not uploaded a CV yet.
+                  request_id: req_7f3a9c1e2b
+            vacancy_not_found:
+              summary: Vacancy or recommendation not found
+              value:
+                error:
+                  code: not_found
+                  message: Vacancy not found.
+                  details:
+                    - location: path
+                      field: vacancy_id
+                      reason: not_found
+                      message: Vacancy with id 101 does not exist.
+                  request_id: req_7f3a9c1e2b
+    Forbidden:
+      description: Credentials are valid, but the caller is not allowed to access this resource — e.g. the token/Telegram ID belongs to user A while the path addresses user B's data.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            not_owner:
+              summary: Caller does not own the resource
+              value:
+                error:
+                  code: permission_denied
+                  message: The authenticated user cannot access another user's data.
+                  details:
+                    - location: path
+                      field: id
+                      reason: not_owner
+                      message: Path user id does not match the authenticated user.
+                  request_id: req_7f3a9c1e2b
+    PayloadTooLarge:
+      description: The uploaded file exceeds the size limit enforced by the server.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: payload_too_large
+              message: The uploaded file is too large.
+              request_id: req_7f3a9c1e2b
+    UnsupportedMediaType:
+      description: The request content type or the uploaded file format is not supported.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: unsupported_media_type
+              message: Only PDF and DOCX files are supported.
+              details:
+                - location: body
+                  field: file
+                  reason: invalid_format
+                  message: Detected file type is image/png.
+              request_id: req_7f3a9c1e2b
+  parameters:
+    LookupTelegramId:
+      name: telegram_id
+      in: query
+      required: false
+      description: Telegram numeric ID (users.telegram_id). Exactly one of `telegram_id` or `username` must be supplied, otherwise 400.
+      schema:
+        type: integer
+        format: int64
+        example: 123456789
+    LookupUsername:
+      name: username
+      in: query
+      required: false
+      description: Telegram username (users.username), case-insensitive, without the leading "@". Exactly one of `telegram_id` or `username` must be supplied, otherwise 400.
+      schema:
+        type: string
+        pattern: ^[A-Za-z0-9_]{5,32}$
+        example: johndoe
+    UserId:
+      name: id
+      in: path
+      required: true
+      description: Internal numeric ID of the user (users.id).
+      schema:
+        type: integer
+        format: int64
+        example: 1
+    VacancySource:
+      name: source
+      in: query
+      required: false
+      description: Filter by source platform (e.g. HH.ru, Telegram).
+      schema:
+        type: string
+        example: HH.ru
+    VacancyCompany:
+      name: company
+      in: query
+      required: false
+      description: Search by company name.
+      schema:
+        type: string
+        example: Acme Corp
+    VacancyLocation:
+      name: location
+      in: query
+      required: false
+      description: Filter by vacancy location.
+      schema:
+        type: string
+        example: Moscow
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return.
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+    Offset:
+      name: offset
+      in: query
+      required: false
+      description: Number of items to skip, for pagination.
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+    VacancyId:
+      name: id
+      in: path
+      required: true
+      description: Internal numeric ID of the vacancy (vacancies.id).
+      schema:
+        type: integer
+        format: int64
+        example: 101
+    MinScore:
+      name: min_score
+      in: query
+      required: false
+      description: Minimum match score filter (0-100).
+      schema:
+        type: integer
+        default: 40
+        minimum: 0
+        maximum: 100
+    IsSeen:
+      name: is_seen
+      in: query
+      required: false
+      description: Filter recommendations by seen status.
+      schema:
+        type: boolean
+    IsFavorite:
+      name: is_favorite
+      in: query
+      required: false
+      description: Filter recommendations by favorite status.
+      schema:
+        type: boolean
+    RecommendationVacancyId:
+      name: vacancy_id
+      in: path
+      required: true
+      description: Internal numeric ID of the vacancy, scoped under a user's recommendations.
+      schema:
+        type: integer
+        format: int64
+        example: 101
+    PendingTasksLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of matching tasks to return.
+      schema:
+        type: integer
+        default: 100
+        minimum: 1
+        maximum: 500
