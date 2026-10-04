@@ -1,0 +1,10 @@
+channels:
+  - username: "tproger_jobs"
+    enabled: true
+    tags: ["it", "development"]
+  - username: "forpython"
+    enabled: true
+    tags: ["python", "backend"]
+  - username: "golang_jobs"
+    enabled: true
+    tags: ["go", "backend"]
