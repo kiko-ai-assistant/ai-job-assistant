@@ -1,0 +1,1 @@
+"""Telegram vacancy parser service."""
