@@ -1,13 +1,8 @@
 package mapper
 
 import (
-	"errors"
-	"net/http"
-
 	httpdto "ai-job-assistant/backend/internal/adapter/in/http/dto"
 	appdto "ai-job-assistant/backend/internal/app/dto"
-	ucerrs "ai-job-assistant/backend/internal/app/errs"
-	pkgerrs "ai-job-assistant/backend/pkg/errs"
 
 	"github.com/google/uuid"
 )
@@ -159,41 +154,4 @@ func MapOutputToGetVacancy(out *appdto.GetVacancyOutput) httpdto.GetVacancyRespo
 	}
 	vac := appdto.VacancyDTO(*out)
 	return httpdto.GetVacancyResponse(toVacancyResponse(&vac))
-}
-
-func HttpError(err error) *pkgerrs.OutErr {
-	if err == nil {
-		return nil
-	}
-
-	var notFound *pkgerrs.ObjectNotFoundError
-	var alreadyExists *pkgerrs.ObjectAlreadyExistsError
-	var valRequired *pkgerrs.ValueRequiredError
-	var valInvalid *pkgerrs.ValueInvalidError
-	var unauth *pkgerrs.NotAuthenticatedError
-
-	switch {
-	case errors.Is(err, pkgerrs.ErrInvalidJSON), errors.Is(err, pkgerrs.ErrInvalidIdentifier):
-		return pkgerrs.NewOutError(http.StatusBadRequest, err.Error(), err)
-	case errors.Is(err, ucerrs.ErrInvalidInput),
-		errors.As(err, &valRequired), errors.Is(err, pkgerrs.ErrValueIsRequired),
-		errors.As(err, &valInvalid), errors.Is(err, pkgerrs.ErrValueIsInvalid):
-		return pkgerrs.NewOutError(http.StatusBadRequest, err.Error(), err)
-	case errors.Is(err, ucerrs.ErrVacancyNotFound),
-		errors.As(err, &notFound), errors.Is(err, pkgerrs.ErrObjectNotFound):
-		return pkgerrs.NewOutError(http.StatusNotFound, err.Error(), err)
-	case errors.Is(err, ucerrs.ErrVacancyAlreadyExists),
-		errors.As(err, &alreadyExists), errors.Is(err, pkgerrs.ErrObjectAlreadyExists):
-		return pkgerrs.NewOutError(http.StatusConflict, err.Error(), err)
-	case errors.As(err, &unauth), errors.Is(err, pkgerrs.ErrNotAuthenticated):
-		return pkgerrs.NewOutError(http.StatusUnauthorized, err.Error(), err)
-	default:
-		return pkgerrs.NewOutError(http.StatusInternalServerError, "internal server error", err)
-	}
-}
-
-func MapErrorToResponse(msg string) httpdto.ErrorResponse {
-	return httpdto.ErrorResponse{
-		Error: msg,
-	}
 }
