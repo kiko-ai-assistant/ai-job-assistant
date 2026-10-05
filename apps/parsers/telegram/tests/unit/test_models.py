@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
+
 from src.config import Settings
 from src.models.channel import ChannelConfig, ChannelsConfigFile
 from src.models.raw_post import RawPost
@@ -12,7 +14,7 @@ from src.models.vacancy import (
 
 
 def test_raw_post_model() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     post = RawPost(
         channel_username="forpython",
         message_id=42,

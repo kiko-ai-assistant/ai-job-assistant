@@ -1,0 +1,73 @@
+import argparse
+import asyncio
+import logging
+
+from src.config import Settings
+from src.extractor.channel_reader import TelethonChannelExtractor
+from src.extractor.telethon_client import TelethonWrapper
+from src.pipeline.orchestrator import ETLPipeline
+from src.pipeline.scheduler import ScheduledRunner
+from src.sink.backend_api import BackendApiSink
+from src.storage.sqlite_store import SqliteStateStore
+from src.transformer.post_parser import PostParser
+from src.utils.logger import setup_logging
+
+logger = logging.getLogger("kiko.parser")
+
+
+async def main() -> None:
+    parser = argparse.ArgumentParser(description="Kiko Telegram Vacancy Parser")
+    parser.add_argument(
+        "--run-once",
+        action="store_true",
+        help="Run single extraction pass across all channels and exit",
+    )
+    args = parser.parse_args()
+
+    settings = Settings()
+    setup_logging(settings.log_level)
+    logger.info("Initializing Telegram Parser Service...")
+
+    wrapper = TelethonWrapper(
+        api_id=settings.tg_api_id,
+        api_hash=settings.tg_api_hash,
+        session_path=settings.tg_session_path,
+    )
+    extractor = TelethonChannelExtractor(wrapper)
+    transformer = PostParser()
+    sink = BackendApiSink(
+        backend_url=settings.backend_url,
+        parser_api_key=settings.parser_api_key,
+    )
+    state_store = SqliteStateStore(settings.sqlite_db_path)
+    await state_store.initialize()
+
+    pipeline = ETLPipeline(
+        extractor=extractor,
+        transformer=transformer,
+        sink=sink,
+        state_store=state_store,
+        batch_size=settings.batch_size,
+    )
+
+    runner = ScheduledRunner(
+        pipeline=pipeline,
+        channels_config_path=settings.channels_config_path,
+        poll_interval_seconds=settings.poll_interval_seconds,
+    )
+
+    try:
+        await extractor.start()
+        if args.run_once:
+            await runner.run_once()
+        else:
+            await runner.start()
+    finally:
+        await extractor.stop()
+        await sink.close()
+        await state_store.close()
+        logger.info("Parser service stopped cleanly.")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
