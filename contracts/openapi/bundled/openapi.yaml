@@ -1093,6 +1093,42 @@ components:
         offset:
           type: integer
           example: 0
+    Salary:
+      type: object
+      required:
+        - text
+        - from
+        - to
+        - currency
+      properties:
+        text:
+          type: string
+          example: 1500$ per month
+        from:
+          type: integer
+          example: 0
+        to:
+          type: integer
+          example: 0
+        currency:
+          type: string
+          example: RUB
+    Location:
+      type: object
+      required:
+        - text
+        - country
+        - city
+      properties:
+        text:
+          type: string
+          example: Bogota, Columbia
+        country:
+          type: string
+          example: Chihuahua
+        city:
+          type: string
+          example: Mexico
     Vacancy:
       type: object
       required:
@@ -1100,14 +1136,17 @@ components:
         - external_id
         - source
         - title
+        - grade
+        - employmentTypes
+        - description
         - url
-        - created_at
-        - parsed_at
+        - publishedAt
+        - parsedAt
       properties:
         id:
-          type: integer
-          format: int64
-          example: 101
+          type: string
+          format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
         external_id:
           type: string
           description: ID of the vacancy at the source platform. Unique together with `source`.
@@ -1122,14 +1161,16 @@ components:
           type: string
           nullable: true
           example: Acme Corp
-        salary_text:
-          type: string
-          nullable: true
-          example: 150 000 - 200 000 RUB
+        salary:
+          $ref: '#/components/schemas/Salary'
+        grade:
+          $ref: '#/components/schemas/Grade'
+        employmentTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmploymentType'
         location:
-          type: string
-          nullable: true
-          example: Moscow / Remote
+          $ref: '#/components/schemas/Location'
         description:
           type: string
           nullable: true
@@ -1137,10 +1178,10 @@ components:
         url:
           type: string
           example: https://hh.ru/vacancy/12345678
-        created_at:
+        publishedAt:
           type: string
           format: date-time
-        parsed_at:
+        parsedAt:
           type: string
           format: date-time
     VacancyPage:
