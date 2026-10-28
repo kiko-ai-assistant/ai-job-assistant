@@ -50,3 +50,7 @@ bin/
 
 # Sub-repositories
 hh-applicant-tool/
+
+# Parsers runtime data
+apps/parsers/**/logs/
+apps/parsers/**/output/
