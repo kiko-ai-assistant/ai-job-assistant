@@ -1,0 +1,15 @@
+# .mockery.yml
+with-expecter: true
+recursive: true
+all: true
+resolve-type-alias: false
+disable-version-string: true
+issue-845-fix: true
+
+dir: "internal/domain/port/mocks"
+outpkg: "mocks"
+
+packages:
+  ai-job-assistant/backend/internal/domain/port:
+    config:
+      all: true
