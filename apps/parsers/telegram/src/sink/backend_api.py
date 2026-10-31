@@ -2,7 +2,7 @@ import httpx
 
 from src.models.vacancy import (
     BatchCreateVacanciesRequest,
-    BatchIngestVacanciesResponse,
+    BatchCreateVacanciesResponse,
     CreateVacancyRequest,
 )
 
@@ -29,18 +29,18 @@ class BackendApiSink(BaseSink):
     async def send_batch(
         self,
         vacancies: list[CreateVacancyRequest],
-    ) -> BatchIngestVacanciesResponse:
+    ) -> BatchCreateVacanciesResponse:
         if not vacancies:
-            return BatchIngestVacanciesResponse(inserted=0, ignored=0)
+            return BatchCreateVacanciesResponse(inserted=0, ignored=0)
 
         payload = BatchCreateVacanciesRequest(vacancies=vacancies)
         response = await self.client.post(
             "/vacancies/batch",
-            content=payload.model_dump_json(),
+            content=payload.model_dump_json(by_alias=True),
         )
         response.raise_for_status()
         data = response.json()
-        return BatchIngestVacanciesResponse.model_validate(data)
+        return BatchCreateVacanciesResponse.model_validate(data)
 
     async def close(self) -> None:
         await self.client.aclose()

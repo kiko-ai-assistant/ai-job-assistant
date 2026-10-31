@@ -11,6 +11,7 @@ class BaseExtractor(ABC):
         channel: str,
         since_message_id: int,
         limit: int = 100,
+        wait_time: float = 3,
     ) -> AsyncIterator[RawPost]:
         """Fetch posts from a channel starting after since_message_id."""
         ...

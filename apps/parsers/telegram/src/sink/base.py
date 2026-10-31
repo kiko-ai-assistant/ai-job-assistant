@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from src.models.vacancy import BatchIngestVacanciesResponse, CreateVacancyRequest
+from src.models.vacancy import BatchCreateVacanciesResponse, CreateVacancyRequest
 
 
 class BaseSink(ABC):
@@ -8,7 +8,7 @@ class BaseSink(ABC):
     async def send_batch(
         self,
         vacancies: list[CreateVacancyRequest],
-    ) -> BatchIngestVacanciesResponse:
+    ) -> BatchCreateVacanciesResponse:
         """Send a batch of vacancies to the destination."""
         ...
 

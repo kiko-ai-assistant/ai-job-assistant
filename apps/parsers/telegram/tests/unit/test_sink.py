@@ -1,7 +1,9 @@
+from datetime import UTC, datetime
+
 import pytest
 import respx
 
-from src.models.vacancy import CreateVacancyRequest
+from src.models.vacancy import CreateVacancyRequest, LocationDTO, SalaryDTO
 from src.sink.backend_api import BackendApiSink
 
 
@@ -10,13 +12,25 @@ async def test_backend_api_sink_sends_batch_with_headers() -> None:
     backend_url = "http://backend.test/api/v1"
     api_key = "secret_parser_key"
 
+    now = datetime.now(UTC)
     sample_vacancy = CreateVacancyRequest(
         external_id="forpython_101",
-        source="Telegram",
+        source="telegram",
         title="Senior Python Developer",
         url="https://t.me/forpython/101",
         company="FinFlow",
-        salary_text="300 000 руб.",
+        salary=SalaryDTO(
+            text="300 000 руб.",
+            from_=300000,
+            to=400000,
+            currency="RUB",
+        ),
+        grade="senior",
+        employment_types=["remote"],
+        location=LocationDTO(text="Remote", country="Russia", city="Moscow"),
+        description="We are seeking an experienced Senior Python Developer to join our team." * 4,
+        published_at=now,
+        parsed_at=now,
     )
 
     with respx.mock(base_url=backend_url) as respx_mock:
@@ -33,7 +47,9 @@ async def test_backend_api_sink_sends_batch_with_headers() -> None:
         assert route.called
         last_request = route.calls.last.request
         assert last_request.headers["X-Parser-Api-Key"] == api_key
-        assert "vacancies" in last_request.content.decode()
+        content_decoded = last_request.content.decode()
+        assert "vacancies" in content_decoded
+        assert '"from":300000' in content_decoded or '"from": 300000' in content_decoded
 
         await sink.close()
 

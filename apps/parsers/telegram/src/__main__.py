@@ -9,8 +9,10 @@ from src.pipeline.orchestrator import ETLPipeline
 from src.pipeline.scheduler import ScheduledRunner
 from src.sink.backend_api import BackendApiSink
 from src.storage.sqlite_store import SqliteStateStore
+from src.transformer.llm_extractor import LlmExtractor
 from src.transformer.post_parser import PostParser
 from src.utils.logger import setup_logging
+from src.validation.validator import VacancyValidator
 
 logger = logging.getLogger("kiko.parser")
 
@@ -34,7 +36,14 @@ async def main() -> None:
         session_path=settings.tg_session_path,
     )
     extractor = TelethonChannelExtractor(wrapper)
-    transformer = PostParser()
+    llm_extractor = LlmExtractor(
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        model=settings.llm_model,
+        timeout=settings.llm_timeout,
+    )
+    validator = VacancyValidator()
+    transformer = PostParser(llm_extractor=llm_extractor, validator=validator)
     sink = BackendApiSink(
         backend_url=settings.backend_url,
         parser_api_key=settings.parser_api_key,
@@ -64,6 +73,7 @@ async def main() -> None:
             await runner.start()
     finally:
         await extractor.stop()
+        await llm_extractor.close()
         await sink.close()
         await state_store.close()
         logger.info("Parser service stopped cleanly.")

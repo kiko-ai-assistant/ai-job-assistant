@@ -39,7 +39,7 @@ class ETLPipeline:
             extracted_count += 1
             highest_message_id = max(highest_message_id, post.message_id)
 
-            vacancy = self.transformer.transform(post)
+            vacancy = await self.transformer.transform(post)
             if vacancy:
                 transformed_vacancies.append(vacancy)
                 transformed_count += 1
