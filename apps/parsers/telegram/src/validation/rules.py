@@ -1,0 +1,35 @@
+from datetime import timedelta
+
+MIN_TITLE_LEN = 3
+MAX_TITLE_LEN = 100
+
+MIN_COMPANY_LEN = 2
+MAX_COMPANY_LEN = 100
+
+MIN_SALARY_LEN = 2
+MAX_SALARY_LEN = 150
+MIN_SALARY_VAL = 0
+MAX_SALARY_VAL = 100_000_000
+
+MIN_CURRENCY_LEN = 3
+MAX_CURRENCY_LEN = 3
+
+MIN_LOC_TEXT_LEN = 2
+MAX_LOC_TEXT_LEN = 80
+MIN_LOC_COUNTRY_LEN = 2
+MAX_LOC_COUNTRY_LEN = 40
+MIN_LOC_CITY_LEN = 2
+MAX_LOC_CITY_LEN = 50
+
+MIN_DESCRIPTION_LEN = 300
+MAX_DESCRIPTION_LEN = 2500
+
+MIN_URL_LEN = 10
+MAX_URL_LEN = 1024
+
+VACANCY_VALID_UP_TO = timedelta(days=7)
+MAX_FUTURE_TIME_SKEW = timedelta(minutes=5)
+
+VALID_SOURCES = {"hh", "telegram", "ozon", "mts"}
+VALID_GRADES = {"intern", "junior", "middle", "senior", "lead"}
+VALID_EMPLOYMENT_TYPES = {"remote", "office", "hybrid", "contract"}
