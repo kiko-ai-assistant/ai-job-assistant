@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,17 +9,61 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
-    tg_api_id: int = 0
-    tg_api_hash: str = ""
-    tg_session_path: Path = Path("data/sessions/parser.session")
+    tg_api_id: int = Field(default=0, alias="TG_API_ID")
+    tg_api_hash: str = Field(default="", alias="TG_API_HASH")
+    tg_session_path: Path | None = Field(default=None, alias="TG_SESSION_PATH")
 
-    backend_url: str = "http://localhost:8080/api/v1"
-    parser_api_key: str = "test_key"
+    backend_url: str = Field(default="http://localhost:8080/api/v1", alias="BACKEND_URL")
+    backend_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "BACKEND_API_KEY",
+            "PARSER_API_KEY",
+            "backend_api_key",
+            "parser_api_key",
+        ),
+    )
 
-    poll_interval_seconds: int = 1800
-    batch_size: int = 50
-    sqlite_db_path: Path = Path("data/state.sqlite")
-    channels_config_path: Path = Path("config/channels.yaml")
-    log_level: str = "INFO"
+    poll_interval_seconds: int = Field(
+        default=1800,
+        validation_alias=AliasChoices(
+            "POLL_INTERVAL_SECONDS",
+            "POLL_INTERVAL",
+            "poll_interval_seconds",
+        ),
+    )
+    batch_size: int = Field(default=50, alias="BATCH_SIZE")
+    state_storage_path: Path = Field(
+        default=Path("data/state.sqlite"),
+        validation_alias=AliasChoices(
+            "STATE_STORAGE",
+            "SQLITE_DB_PATH",
+            "state_storage_path",
+            "sqlite_db_path",
+        ),
+    )
+    channels_config_path: Path = Field(
+        default=Path("data/config/channels.yaml"),
+        validation_alias=AliasChoices(
+            "CHANNELS_CONFIG_PATH",
+            "CHANNELS_CONFIG",
+            "channels_config_path",
+        ),
+    )
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    llm_api_key: str = Field(default="", alias="LLM_API_KEY")
+    llm_base_url: str = Field(default="https://openrouter.ai/api/v1", alias="LLM_BASE_URL")
+    llm_model: str = Field(default="meta-llama/llama-3.3-70b-instruct:free", alias="LLM_MODEL")
+    llm_timeout: float = Field(default=30.0, alias="LLM_TIMEOUT")
+
+    @property
+    def parser_api_key(self) -> str:
+        return self.backend_api_key
+
+    @property
+    def sqlite_db_path(self) -> Path:
+        return self.state_storage_path
