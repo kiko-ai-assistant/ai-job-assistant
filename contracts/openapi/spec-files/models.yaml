@@ -397,32 +397,56 @@ components:
         - external_id
         - source
         - title
+        - grade
+        - employment_types
+        - description
         - url
+        - published_at
+        - parsed_at
       properties:
         external_id:
           type: string
           example: "12345678"
         source:
           type: string
-          example: "HH.ru"
+          example: "telegram"
         title:
           type: string
-          example: "Go Developer"
+          minLength: 3
+          maxLength: 100
+          example: "Junior Go Developer"
         company:
           type: string
+          nullable: true
+          minLength: 2
+          maxLength: 100
           example: "Acme Corp"
-        salary_text:
-          type: string
-          example: "до 250 000 руб."
+        salary:
+          $ref: '#/components/schemas/Salary'
+        grade:
+          $ref: '#/components/schemas/Grade'
+        employment_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmploymentType'
         location:
-          type: string
-          example: "Remote"
+          $ref: '#/components/schemas/Location'
         description:
           type: string
-          example: "Описание вакансии..."
+          minLength: 300
+          maxLength: 2500
+          example: "We are looking for a Junior Go Developer..."
         url:
           type: string
-          example: "https://hh.ru/vacancy/12345678"
+          minLength: 10
+          maxLength: 1024
+          example: "https://t.me/channel/123"
+        published_at:
+          type: string
+          format: date-time
+        parsed_at:
+          type: string
+          format: date-time
 
     VacancyPage:
       allOf:
