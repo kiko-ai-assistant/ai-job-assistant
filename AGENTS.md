@@ -1,48 +1,27 @@
-# Project Conventions & AI Steering Standards
+# Project Context: AI Job Assistant
+You are a Senior Software Developer and Backend Architect. This is a polyglot monorepository containing AI-based job searching platform with web dashboard and Telegram client.
 
-## 1. Git Commit Messages
-Всегда коммить все изменения, которые ты применил. 
-При создании сообщений для Git-коммитов строго соблюдай следующие правила:
-1. Используй английский язык.
-2. Пиши сообщение кратко и по делу, без точки в конце.
+## Layers & Architecture
+- The system contains many independent microservices:
+  - `contracts/openapi/` - single source of truth.
+  - `apps/backend` - owns database and business logic (Go 1.26.2, Echo, sqlc)
+  - `apps/parsers` - includes web-sites and Telegram scrappers (Python 3.12+, Scrapling, Telethon)
+  - `apps/web` - frontend; simple dashboard of vacancies (TypeScript)
+  - `apps/bot` - Telegram bot with all features access (Python 3.12+, Aiogram 3.x+)
+  - `apps/engine` - AI matching (Python 3.12+, OpenRouter/OpenAI models)
+- Only backend accesses the database. Other services use backend REST API.
+- Contract-first: change `contracts/openapi/` → edit clients → implement.
 
-Примеры правильных коммитов:
-- add helper CompareAPIKeyHash in pkg/utils
-- update OpenAPI spec
+Each service has its own AGENTS.md with details; read it before working there.
 
-## 2. General Code Standards
-При написании любого кода в этом проекте следуй следующим правилам:
-1. Проект должен следовать принципам чистой архитектуры (clean architecture) и DDD (Domain-Driven Design).
-2. При импорте пакета pkg(экспортируемые утилиты, ошибки и клиенты) всегда присваивай alias с префиксом `pkg`.
-   Например, `pkgerrs` для `.../pkg/errs`, `pkgutils` для `.../pkg/utils`.
+## Conventions
+- Code, commits and docs in pure technical english.
+- Do not add comments in the code if user didn't request it.
+- Secrets only via env vars; never commit `.env`.
+- Ask before adding dependencies or changing contracts.
 
-## 3. Unit Testing Standards
-При генерации юнит-тестов (*_test.go) обязательно соблюдай правила:
-- Все тесты должны быть написаны в `table-driven` стиле.
-- Используй генератор фейковых данных `github.com/brianvoe/gofakeit/v7` по максимуму во всех тестовых значениях. Избегай хардкода строк, где это возможно.
-- При использовании генератора `github.com/brianvoe/gofakeit/v7` **запрещено** вызывать функции `gofakeit.Word()` и `gofakeit.Sentence(n)`, вместо
-  этого вызывай `gofakeit.ProductDescription()` или `gofakeit.ProductName()` в зависимости от назначения).
-- Используй helper-функции из пакета `pkg/utils` (в частности `utils.VPtr` для взятия указателей от значений).
-- Проверяй ошибки строго через доменные ошибки из `pkg/errs`.
-- Покрывай тестами счастливый путь, граничные значения, пустые обязательные поля, восстановление (Restore), бизнес-логику и мутации.
-- Используй `github.com/stretchr/testify/assert` для проверок.
-- Для наборов однотипных проверок валидации обязательно используй табличное тестирование (table-driven tests).
-- Комментарии внутри файлов тестов также запрещены.
-
-## 4. Integration Testing Standards
-При написании интеграционных тестов строго придерживайся следующих правил:
-- Изоляция тестов: обязательно указывай `//go:build integration` в самом начале файла.
-- Используй пакет `github.com/stretchr/testify/suite` для организации тестов, настройки окружения (`SetupSuite`) и подготовки БД перед каждым кейсом (`SetupTest`).
-- Обязательно очищай таблицы базы данных перед каждым тестом (`TruncateTables` внутри `SetupTest`).
-- Как и в unit-тестах, максимально используй `github.com/brianvoe/gofakeit/v7` для тестовых значений.
-- Покрытие сценариев: Интеграционные тесты должны проверять создание, получение (включая NotFound), обновление записей, а также проверку ограничений БД (например, дубликаты по UNIQUE индексам).
-- Комментарии внутри тестовых файлов полностью запрещены.
-
-## 5. Linter Standards & Execution Workflow
-При запросе на проведение линтинг-проверки или исправление кода выполняй следующие шаги:
-1. **Проверка конфигурации**: Проверь наличие файла конфигурации (`.golangci.yml` или `.golangci.toml`) в корне проекта.
-    - Если файла **нет**, создай его с базовым необходимым набором линтеров (`govet`, `errcheck`, `staticcheck`, `unused`, `gosimple`) и версий `v2`.
-    - Если файл **есть**, оставь его без изменений.
-2. **Запуск без установки**: Не устанавливай бинарник локально. Запускай актуальную версию напрямую через GitHub с помощью команды:
-   ```bash
-   go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest@latest run --fix
+## Git Commit Standards
+You must commit all modifications using the Conventional Commits specification.
+- Format: `<prefix>: <short imperative description in English without a trailing period>`
+- Allowed Prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
+- Example: `feat: add llm client for engine`
