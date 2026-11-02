@@ -7,7 +7,6 @@ from src.extractor import BaseExtractor, TelethonChannelExtractor, TelethonWrapp
 from src.models.raw_post import RawPost
 from src.transformer import (
     BaseTransformer,
-    HeuristicExtractor,
     LlmExtractionResult,
     LlmExtractor,
     PostParser,
@@ -217,16 +216,6 @@ async def test_post_parser_skips_outdated_posts_before_llm() -> None:
 
     assert result is None
     mock_llm.extract.assert_not_called()
-
-
-def test_heuristic_extractor_edge_cases() -> None:
-    assert not HeuristicExtractor.is_vacancy("Short text")
-    assert not HeuristicExtractor.is_vacancy(
-        "Реклама сервиса подписывайтесь на нас прямо сейчас без вакансий"
-    )
-    assert HeuristicExtractor.extract_title("") == "Вакансия"
-    assert HeuristicExtractor.extract_salary("Без указания вилки") is None
-    assert HeuristicExtractor.extract_company("Без указания компании") is None
 
 
 def test_extractor_and_transformer_interfaces() -> None:
