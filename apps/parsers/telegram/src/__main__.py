@@ -24,6 +24,11 @@ async def main() -> None:
         action="store_true",
         help="Run single extraction pass across all channels and exit",
     )
+    parser.add_argument(
+        "--login",
+        action="store_true",
+        help="Interactively authorize Telegram client and save session file",
+    )
     args = parser.parse_args()
 
     settings = Settings()
@@ -35,6 +40,10 @@ async def main() -> None:
         api_hash=settings.tg_api_hash,
         session_path=settings.tg_session_path,
     )
+    if args.login:
+        await wrapper.login()
+        await wrapper.disconnect()
+        return
     extractor = TelethonChannelExtractor(wrapper)
     llm_extractor = LlmExtractor(
         api_key=settings.llm_api_key,
