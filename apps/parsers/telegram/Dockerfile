@@ -9,7 +9,7 @@ COPY pyproject.toml .
 RUN pip install --no-cache-dir .
 
 COPY src/ ./src/
-COPY config/ ./config/
+COPY data/ ./data/
 RUN mkdir -p data/sessions
 
 CMD ["python", "-m", "src"]
