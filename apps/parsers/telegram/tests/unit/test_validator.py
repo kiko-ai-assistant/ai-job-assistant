@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 
@@ -25,7 +26,7 @@ from src.validation.rules import (
 from src.validation.validator import VacancyValidator
 
 
-def build_valid_vacancy(**kwargs) -> CreateVacancyRequest:
+def build_valid_vacancy(**kwargs: Any) -> CreateVacancyRequest:
     now = kwargs.pop("now", datetime.now(UTC))
     desc = (
         "We are seeking an experienced Go developer to join our core backend engineering "
@@ -58,7 +59,7 @@ def build_valid_vacancy(**kwargs) -> CreateVacancyRequest:
     return CreateVacancyRequest(**defaults)
 
 
-def test_validator_happy_path_full():
+def test_validator_happy_path_full() -> None:
     now = datetime.now(UTC)
     vacancy = build_valid_vacancy(now=now)
     validator = VacancyValidator()
@@ -67,7 +68,7 @@ def test_validator_happy_path_full():
     assert result.reasons == []
 
 
-def test_validator_happy_path_minimal():
+def test_validator_happy_path_minimal() -> None:
     now = datetime.now(UTC)
     vacancy = build_valid_vacancy(
         company=None,
@@ -105,7 +106,10 @@ def test_validator_happy_path_minimal():
         ({"employment_types": ["freelance"]}, "employment_type"),
     ],
 )
-def test_validator_field_rejections(mutate_kwargs, expected_reason_substr):
+def test_validator_field_rejections(
+    mutate_kwargs: dict[str, Any],
+    expected_reason_substr: str,
+) -> None:
     now = datetime.now(UTC)
     vacancy = build_valid_vacancy(now=now, **mutate_kwargs)
     validator = VacancyValidator()
@@ -167,7 +171,7 @@ def test_validator_field_rejections(mutate_kwargs, expected_reason_substr):
         ),
     ],
 )
-def test_validator_salary_invariants(salary_dto, expected_reason):
+def test_validator_salary_invariants(salary_dto: SalaryDTO, expected_reason: str) -> None:
     now = datetime.now(UTC)
     vacancy = build_valid_vacancy(salary=salary_dto, now=now)
     validator = VacancyValidator()
@@ -213,7 +217,7 @@ def test_validator_salary_invariants(salary_dto, expected_reason):
         ),
     ],
 )
-def test_validator_location_invariants(location_dto, expected_reason):
+def test_validator_location_invariants(location_dto: LocationDTO, expected_reason: str) -> None:
     now = datetime.now(UTC)
     vacancy = build_valid_vacancy(location=location_dto, now=now)
     validator = VacancyValidator()
@@ -247,7 +251,11 @@ def test_validator_location_invariants(location_dto, expected_reason):
         ),
     ],
 )
-def test_validator_date_invariants(published_delta, parsed_delta, expected_reason_substr):
+def test_validator_date_invariants(
+    published_delta: timedelta,
+    parsed_delta: timedelta,
+    expected_reason_substr: str,
+) -> None:
     now = datetime.now(UTC)
     vacancy = build_valid_vacancy(
         published_at=now + published_delta,
@@ -270,7 +278,11 @@ def test_validator_date_invariants(published_delta, parsed_delta, expected_reaso
         ("hh", "Lead", ["hybrid"]),
     ],
 )
-def test_validator_case_insensitivity(source, grade, employment_types):
+def test_validator_case_insensitivity(
+    source: str,
+    grade: str,
+    employment_types: list[str],
+) -> None:
     now = datetime.now(UTC)
     vacancy = build_valid_vacancy(
         source=source,

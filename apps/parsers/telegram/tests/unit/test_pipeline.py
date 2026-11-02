@@ -27,7 +27,11 @@ class MockExtractor(BaseExtractor):
         pass
 
     async def fetch_posts(
-        self, channel: str, since_message_id: int, limit: int = 100
+        self,
+        channel: str,
+        since_message_id: int,
+        limit: int = 100,
+        wait_time: float = 3,
     ) -> AsyncIterator[RawPost]:
         for p in self.posts:
             if p.message_id > since_message_id:
