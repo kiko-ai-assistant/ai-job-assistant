@@ -5,6 +5,7 @@ from src.models.raw_post import RawPost
 from src.models.vacancy import CreateVacancyRequest, LocationDTO, SalaryDTO
 from src.transformer.base import BaseTransformer
 from src.transformer.llm_extractor import LlmExtractor
+from src.validation.rules import VACANCY_VALID_UP_TO
 from src.validation.validator import VacancyValidator
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,13 @@ class PostParser(BaseTransformer):
 
     async def transform(self, post: RawPost) -> CreateVacancyRequest | None:
         try:
+            post_date = (
+                post.date if post.date.tzinfo is not None else post.date.replace(tzinfo=UTC)
+            )
+            if post_date < (datetime.now(UTC) - VACANCY_VALID_UP_TO):
+                logger.info("Post url=%s skipped: published_at older than valid window", post.url)
+                return None
+
             result = await self.llm_extractor.extract(post.text)
             if not result.is_vacancy:
                 logger.info("Post url=%s rejected: not a vacancy (%s)", post.url, result.reason)

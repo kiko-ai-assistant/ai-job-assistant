@@ -200,6 +200,25 @@ async def test_post_parser_custom_source() -> None:
     assert result.source == "telegram"
 
 
+@pytest.mark.asyncio
+async def test_post_parser_skips_outdated_posts_before_llm() -> None:
+    now = datetime.now(UTC)
+    raw_post = RawPost(
+        channel_username="forpython",
+        message_id=105,
+        text="Senior Python Developer в FinFlow.",
+        date=now - timedelta(days=8),
+        url="https://t.me/forpython/105",
+    )
+
+    mock_llm = AsyncMock(spec=LlmExtractor)
+    parser = PostParser(llm_extractor=mock_llm)
+    result = await parser.transform(raw_post)
+
+    assert result is None
+    mock_llm.extract.assert_not_called()
+
+
 def test_heuristic_extractor_edge_cases() -> None:
     assert not HeuristicExtractor.is_vacancy("Short text")
     assert not HeuristicExtractor.is_vacancy(
