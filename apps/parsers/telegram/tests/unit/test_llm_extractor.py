@@ -121,7 +121,7 @@ TEST_CASES = [
         "error_network_timeout",
         None,
         None,
-        httpx.ConnectTimeout("Connection timeout to OpenRouter"),
+        httpx.ConnectTimeout("Connection timeout to LLM service"),
         False,
         "LLM request error:",
         None,
@@ -151,7 +151,9 @@ async def test_llm_extractor_table_driven(
     expected_reason_substr: str | None,
     expected_data: dict[str, Any] | None,
 ) -> None:
-    api_url = "https://openrouter.ai/api/v1/chat/completions"
+    base_url = "https://llm.example.com/v1"
+    model = "test-model"
+    api_url = f"{base_url}/chat/completions"
     if side_effect is not None:
         route = respx_mock.post(api_url).mock(side_effect=side_effect)
     else:
@@ -160,7 +162,11 @@ async def test_llm_extractor_table_driven(
             return_value=httpx.Response(status_code=status_code, json=json_body)
         )
 
-    extractor = LlmExtractor(api_key="test-api-key")
+    extractor = LlmExtractor(
+        api_key="test-api-key",
+        base_url=base_url,
+        model=model,
+    )
     result = await extractor.extract("Looking for Senior Python Developer")
     await extractor.close()
 
@@ -176,7 +182,8 @@ async def test_llm_extractor_table_driven(
 
 
 async def test_llm_extractor_request_payload_and_headers(respx_mock: MockRouter) -> None:
-    api_url = "https://openrouter.ai/api/v1/chat/completions"
+    base_url = "https://llm.example.com/v1"
+    api_url = f"{base_url}/chat/completions"
     route = respx_mock.post(api_url).mock(
         return_value=httpx.Response(
             status_code=200,
@@ -186,6 +193,7 @@ async def test_llm_extractor_request_payload_and_headers(respx_mock: MockRouter)
 
     async with LlmExtractor(
         api_key="secret-key",
+        base_url=base_url,
         model="custom-model",
     ) as extractor:
         result = await extractor.extract("Sample post text")
@@ -202,7 +210,8 @@ async def test_llm_extractor_request_payload_and_headers(respx_mock: MockRouter)
 
 
 async def test_llm_extractor_external_client_lifecycle(respx_mock: MockRouter) -> None:
-    api_url = "https://openrouter.ai/api/v1/chat/completions"
+    base_url = "https://llm.example.com/v1"
+    api_url = f"{base_url}/chat/completions"
     respx_mock.post(api_url).mock(
         return_value=httpx.Response(
             status_code=200,
@@ -211,7 +220,12 @@ async def test_llm_extractor_external_client_lifecycle(respx_mock: MockRouter) -
     )
 
     external_client = httpx.AsyncClient()
-    extractor = LlmExtractor(api_key="test-key", client=external_client)
+    extractor = LlmExtractor(
+        api_key="test-key",
+        base_url=base_url,
+        model="test-model",
+        client=external_client,
+    )
     result = await extractor.extract("Sample post text")
     assert result.is_vacancy is True
 

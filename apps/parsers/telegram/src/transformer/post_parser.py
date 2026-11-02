@@ -14,11 +14,11 @@ logger = logging.getLogger(__name__)
 class PostParser(BaseTransformer):
     def __init__(
         self,
-        llm_extractor: LlmExtractor | None = None,
+        llm_extractor: LlmExtractor,
         validator: VacancyValidator | None = None,
         default_source: str = "telegram",
     ) -> None:
-        self.llm_extractor = llm_extractor if llm_extractor is not None else LlmExtractor()
+        self.llm_extractor = llm_extractor
         self.validator = validator if validator is not None else VacancyValidator()
         self.default_source = default_source
 

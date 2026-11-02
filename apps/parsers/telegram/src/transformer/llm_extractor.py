@@ -49,9 +49,9 @@ class LlmExtractionResult:
 class LlmExtractor:
     def __init__(
         self,
-        api_key: str = "",
-        base_url: str = "https://openrouter.ai/api/v1",
-        model: str = "meta-llama/llama-3.3-70b-instruct:free",
+        api_key: str,
+        base_url: str,
+        model: str,
         timeout: float = 30.0,
         client: httpx.AsyncClient | None = None,
     ) -> None:

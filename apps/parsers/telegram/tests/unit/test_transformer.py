@@ -162,7 +162,7 @@ async def test_post_parser_handles_extractor_exception() -> None:
     )
 
     mock_llm = AsyncMock(spec=LlmExtractor)
-    mock_llm.extract.side_effect = RuntimeError("OpenRouter connection failed")
+    mock_llm.extract.side_effect = RuntimeError("LLM connection failed")
 
     parser = PostParser(llm_extractor=mock_llm)
     result = await parser.transform(raw_post)
