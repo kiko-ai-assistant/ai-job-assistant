@@ -38,7 +38,7 @@ def _make_vacancy(
         company="TechCorp Inc",
         salary=SalaryDTO(
             text="200k",
-            from_=200000,  # type: ignore[call-arg]
+            from_=200000,
             to=250000,
             currency="RUB",
         ),
