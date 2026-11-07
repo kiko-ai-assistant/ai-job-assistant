@@ -155,6 +155,7 @@ def test_location_dto(
         (
             {
                 "external_id": "job_1",
+                "source": "telegram",
                 "title": "Senior Go Developer",
                 "grade": "Senior",
                 "description": "Full vacancy description",
@@ -227,6 +228,7 @@ def test_create_vacancy_request_valid(
 def test_create_vacancy_request_validation_errors(missing_field: str) -> None:
     valid_data: dict[str, Any] = {
         "external_id": "valid_id",
+        "source": "telegram",
         "title": "Backend Developer",
         "grade": "Middle",
         "description": "Some description",
@@ -256,6 +258,7 @@ def test_batch_create_vacancies(
     vacancies = [
         CreateVacancyRequest(
             external_id=f"ext_{idx}",
+            source="telegram",
             title="Engineer",
             grade="Middle",
             description="Work",

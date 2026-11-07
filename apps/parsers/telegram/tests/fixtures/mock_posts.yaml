@@ -1,0 +1,159 @@
+- id: "senior_python"
+  expected_is_vacancy: true
+  channel_username: "python_jobs"
+  message_id: 101
+  text: |
+    Senior Python Developer в FinTech экосистему PayCore
+
+    Компания: PayCore
+    Формат: Офисы в Сербии(Москва, Новосибирск)
+    Занятость: Полная
+    Грейд: Senior
+    Зарплатная вилка: от 350 000 до 450 000 руб. на руки
+
+    О проекте:
+    Мы разрабатываем отказоустойчивую платежную платформу с микросервисной архитектурой, обрабатывающую миллионы транзакций в сутки.
+
+    Что предстоит делать:
+    - Проектировать и развивать high-load backend сервисы на Python / FastAPI
+    - Оптимизировать запросы PostgreSQL и кэширование в Redis
+    - Настраивать межсервисное взаимодействие через Apache Kafka
+    - Участвовать в архитектурных ревью и менторить младших коллег
+
+    Требования:
+    - Опыт коммерческой разработки на Python от 4 лет
+    - Отличное знание FastAPI, asyncio, PostgreSQL, SQLAlchemy / Tortoise ORM
+    - Опыт работы с брокерами сообщений (Kafka / RabbitMQ)
+    - Опыт работы с Docker, Kubernetes, CI/CD
+
+    Условия:
+    - Официальное оформление или по договору ИП/самозанятости
+    - Полный ДМС со стоматологией
+    - Бюджет на обучение и технику
+    - Гибкое начало рабочего дня
+
+    Контакты: @paycore_talent
+
+- id: "middle_devops"
+  expected_is_vacancy: true
+  channel_username: "devops_jobs"
+  message_id: 102
+  text: |
+    Position: Middle DevOps Engineer
+    Company: CloudScale Solutions
+    Salary: $3,000 - $4,500 net
+    Location: Limassol, Cyprus (Hybrid or Full Remote)
+    Grade: Middle
+    Type: Full-time
+
+    About Us:
+    CloudScale Solutions is a global SaaS provider helping fintech and ecommerce enterprises scale their Kubernetes infrastructure.
+
+    Responsibilities:
+    - Maintain and improve multi-region Kubernetes clusters (EKS, GKE)
+    - Automate CI/CD pipelines using GitHub Actions and ArgoCD
+    - Implement Infrastructure as Code using Terraform and Terragrunt
+    - Setup observability stack (Prometheus, Grafana, VictoriaMetrics, OpenTelemetry)
+
+    Requirements:
+    - 2+ years of DevOps / SRE experience in production environments
+    - Strong knowledge of Linux, Docker, Kubernetes
+    - Hands-on experience with AWS and Terraform
+    - English: B2+ (international distributed team)
+
+    Benefits:
+    - Competitive salary pegged to USD
+    - 28 paid vacation days
+    - Modern MacBook Pro provided
+    - Relocation package to Cyprus if desired
+
+    Apply: Send CV to @cloudscale_hr
+
+- id: "junior_frontend"
+  expected_is_vacancy: true
+  channel_username: "frontend_jobs"
+  message_id: 103
+  text: |
+    Ищем Junior Frontend Developer (React / TypeScript) в стартап EdTech Nova!
+
+    Локация: Офис в Москве (м. Белорусская), гибкий график
+    Уровень: Junior
+    Занятость: Полный день
+
+    Чем предстоит заниматься:
+    - Разработка компонентов интерфейса интерактивной образовательной платформы
+    - Верстка адаптивных и доступных интерфейсов по макетам Figma
+    - Интеграция с backend REST API и WebSocket
+    - Написание модульных тестов с Vitest и React Testing Library
+
+    Наши ожидания:
+    - Уверенное владение JavaScript (ES6+), TypeScript, React 18+
+    - Понимание работы HTML5, CSS3, Tailwind CSS
+    - Опыт работы с Git (ветки, rebase, pull requests)
+    - Наличие учебных или пет-проектов в портфолио
+
+    Что мы предлагаем:
+    - Менторство со стороны Senior инженера
+    - Комфортный офис с кофе и снеками
+    - Карьерный рост до Middle через 1-1.5 года
+
+    Откликнуться: @edtech_recruitment
+
+- id: "course_promo"
+  expected_is_vacancy: false
+  channel_username: "it_digest"
+  message_id: 104
+  text: |
+    Черная пятница в онлайн-школе ProSkills!
+
+    Хотите войти в IT или прокачать свои навыки в Machine Learning и Data Science?
+    Только до конца недели скидка 50% на легендарный курс "Machine Learning с нуля до Middle"!
+
+    Программа курса:
+    - Python для анализа данных (Pandas, NumPy)
+    - Классическое машинное обучение (Scikit-Learn)
+    - Нейросети и Deep Learning (PyTorch)
+    - LLM и агенты (LangChain, LlamaIndex)
+
+    В подарок: карьерная консультация и помощь с резюме!
+    Успейте занять место по промокоду PROML50: https://proskills.school/ml-course
+
+- id: "candidate_resume"
+  expected_is_vacancy: false
+  channel_username: "qa_resumes"
+  message_id: 105
+  text: |
+    Имя: Алексей
+    Позиция: Middle QA Automation Engineer (Python)
+    Формат работы: Удаленка
+    Локация: Санкт-Петербург
+    Ожидания по зарплате: от 180 000 руб.
+
+    Обо мне:
+    Более 3 лет опыта в автоматизированном и ручном тестировании веб-сервисов и мобильных приложений.
+
+    Стек: Python, Pytest, Playwright, Selenium, Allure, Postman, PostgreSQL, Docker, Git.
+
+    Опыт:
+    - Построение фреймворка автотестирования API и UI с нуля на Pytest + Playwright
+    - Интеграция автотестов в GitLab CI пайплайн
+    - Нагрузочное тестирование с Locust
+    - Ведение тест-кейсов и баг-репортов в Jira / TestRail
+
+    Связь: @alexey_qa_auto
+
+- id: "meetup_announcement"
+  expected_is_vacancy: false
+  channel_username: "tech_events"
+  message_id: 106
+  text: |
+    Приглашаем на открытый митап по Go и распределенным базам данных!
+
+    Дата: 20 ноября, 19:00 МСК
+    Формат: Онлайн трансляция на YouTube
+
+    Спикеры и темы:
+    1. Иван Петров (Yandex) — "Как мы готовим Raft в распределенных транзакциях"
+    2. Анна Смирнова (Ozon) — "Оптимизация аллокаций памяти в Go 1.23"
+
+    Участие бесплатное, обязательна регистрация: https://event.tech/go-meetup-2026

@@ -1,18 +1,6 @@
-from abc import ABC, abstractmethod
+from parsers_base.sink.base import BaseSink, SinkError
 
-from src.models.vacancy import BatchCreateVacanciesResponse, CreateVacancyRequest
-
-
-class BaseSink(ABC):
-    @abstractmethod
-    async def send_batch(
-        self,
-        vacancies: list[CreateVacancyRequest],
-    ) -> BatchCreateVacanciesResponse:
-        """Send a batch of vacancies to the destination."""
-        ...
-
-    @abstractmethod
-    async def close(self) -> None:
-        """Cleanly close connections."""
-        ...
+__all__ = [
+    "BaseSink",
+    "SinkError",
+]
