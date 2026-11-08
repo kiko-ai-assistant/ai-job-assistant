@@ -230,12 +230,12 @@ async def run_parsing(
 
             for idx, post in enumerate(channel_posts, start=1):
                 preview = " ".join(post.text.split())[:60]
-                print(f"    [{idx}/{len(channel_posts)}] Post #{post.message_id}: \"{preview}...\"")
+                print(f"    [{idx}/{len(channel_posts)}] Post #{post.message_id}: \"{preview}...\"", flush=True)
                 
                 vacancy = await post_parser.transform(post)
                 if vacancy is None:
                     channel_stats["non_vacancies"] += 1
-                    print(f"        -> Rejected (Not a vacancy or invalid)")
+                    print(f"        -> Rejected (Not a vacancy or invalid)", flush=True)
                 else:
                     try:
                         assert_vacancy_contract(vacancy)
@@ -243,10 +243,10 @@ async def run_parsing(
                         all_extracted_vacancies.append(vacancy)
                         salary_info = f"{vacancy.salary.from_ or ''}-{vacancy.salary.to or ''} {vacancy.salary.currency or ''}" if vacancy.salary else "not specified"
                         loc_info = vacancy.location.city if vacancy.location and vacancy.location.city else (vacancy.location.text if vacancy.location else "not specified")
-                        print(f"        -> [OK] Title: '{vacancy.title}' | Grade: {vacancy.grade} | Employment: {vacancy.employment_types} | Salary: {salary_info} | Loc: {loc_info}")
+                        print(f"        -> [OK] Title: '{vacancy.title}' | Grade: {vacancy.grade} | Employment: {vacancy.employment_types} | Salary: {salary_info} | Loc: {loc_info}", flush=True)
                     except AssertionError as err:
                         channel_stats["validation_errors"] += 1
-                        print(f"        -> [ASSERTION FAILED]: {err}")
+                        print(f"        -> [ASSERTION FAILED]: {err}", flush=True)
 
                 await asyncio.sleep(1.5)
 

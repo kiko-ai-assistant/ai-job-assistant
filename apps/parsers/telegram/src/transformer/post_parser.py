@@ -41,9 +41,36 @@ class PostParser(BaseTransformer):
             data = result.data or {}
             raw_salary = data.get("salary")
             salary = SalaryDTO.model_validate(raw_salary) if raw_salary else None
+            if salary and (salary.from_ is not None or salary.to is not None):
+                curr = (salary.currency or "RUB").strip()
+                if curr in {"₽", "руб", "руб.", "RUR", "rur"}:
+                    curr = "RUB"
+                elif curr in {"$", "usd"}:
+                    curr = "USD"
+                elif curr in {"€", "eur"}:
+                    curr = "EUR"
+                salary.currency = curr
 
             raw_location = data.get("location")
             location = LocationDTO.model_validate(raw_location) if raw_location else None
+            if location and location.city and not location.country:
+                location.country = "Russia"
+
+            description = (data.get("description") or post.text).strip()
+            if len(description) < 300 and len(post.text.strip()) >= 300:
+                description = post.text.strip()
+            if len(description) > 2500:
+                description = description[:2500].rstrip()
+
+            grade = (data.get("grade") or "").strip().lower()
+            if grade.endswith("+"):
+                grade = grade[:-1].strip()
+
+            employment_types = [
+                et.lower().strip() for et in (data.get("employment_types") or [])
+            ]
+
+            parsed_at = post.date if self.ignore_date_window else datetime.now(UTC)
 
             vacancy = CreateVacancyRequest(
                 external_id=f"{post.channel_username}_{post.message_id}",
@@ -51,13 +78,13 @@ class PostParser(BaseTransformer):
                 title=data.get("title") or "",
                 company=data.get("company"),
                 salary=salary,
-                grade=data.get("grade") or "",
-                employment_types=data.get("employment_types") or [],
+                grade=grade,
+                employment_types=employment_types,
                 location=location,
-                description=data.get("description") or post.text,
+                description=description,
                 url=post.url,
                 published_at=post.date,
-                parsed_at=datetime.now(UTC),
+                parsed_at=parsed_at,
             )
 
             validation_now = post_date if self.ignore_date_window else None

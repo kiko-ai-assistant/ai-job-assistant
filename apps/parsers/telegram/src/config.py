@@ -66,7 +66,7 @@ class Settings(BaseSettings):
         ),
     )
     llm_base_url: str = Field(default="https://openrouter.ai/api/v1", alias="LLM_BASE_URL")
-    llm_model: str = Field(default="meta-llama/llama-3.3-70b-instruct:free", alias="LLM_MODEL")
+    llm_model: str = Field(default="nvidia/nemotron-3.5-lightning:free", alias="LLM_MODEL")
     llm_timeout: float = Field(default=30.0, alias="LLM_TIMEOUT")
 
     @property
