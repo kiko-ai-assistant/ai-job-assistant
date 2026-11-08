@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     tg_api_id: int = Field(default=0, alias="TG_API_ID")
     tg_api_hash: str = Field(default="", alias="TG_API_HASH")
+    tg_phone: str | None = Field(default=None, alias="TG_PHONE")
     tg_session_path: Path | None = Field(default=None, alias="TG_SESSION_PATH")
 
     backend_url: str = Field(default="http://localhost:8080/api/v1", alias="BACKEND_URL")
@@ -55,7 +56,15 @@ class Settings(BaseSettings):
     )
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
-    llm_api_key: str = Field(default="", alias="LLM_API_KEY")
+    llm_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "LLM_API_KEY",
+            "OPENROUTER_API_KEY",
+            "llm_api_key",
+            "openrouter_api_key",
+        ),
+    )
     llm_base_url: str = Field(default="https://openrouter.ai/api/v1", alias="LLM_BASE_URL")
     llm_model: str = Field(default="meta-llama/llama-3.3-70b-instruct:free", alias="LLM_MODEL")
     llm_timeout: float = Field(default=30.0, alias="LLM_TIMEOUT")
@@ -63,6 +72,15 @@ class Settings(BaseSettings):
     @property
     def parser_api_key(self) -> str:
         return self.backend_api_key
+
+    @property
+    def resolved_session_path(self) -> Path:
+        base_dir = Path(__file__).resolve().parent.parent
+        if self.tg_session_path is not None:
+            if self.tg_session_path.is_absolute():
+                return self.tg_session_path
+            return (base_dir / self.tg_session_path).resolve()
+        return (base_dir / "data" / "sessions" / "parser.session").resolve()
 
     @property
     def sqlite_db_path(self) -> Path:

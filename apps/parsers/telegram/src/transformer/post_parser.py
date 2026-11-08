@@ -17,17 +17,19 @@ class PostParser(BaseTransformer):
         llm_extractor: LlmExtractor,
         validator: VacancyValidator | None = None,
         default_source: str = "telegram",
+        ignore_date_window: bool = False,
     ) -> None:
         self.llm_extractor = llm_extractor
         self.validator = validator if validator is not None else VacancyValidator()
         self.default_source = default_source
+        self.ignore_date_window = ignore_date_window
 
     async def transform(self, post: RawPost) -> CreateVacancyRequest | None:
         try:
             post_date = (
                 post.date if post.date.tzinfo is not None else post.date.replace(tzinfo=UTC)
             )
-            if post_date < (datetime.now(UTC) - VACANCY_VALID_UP_TO):
+            if not self.ignore_date_window and post_date < (datetime.now(UTC) - VACANCY_VALID_UP_TO):
                 logger.info("Post url=%s skipped: published_at older than valid window", post.url)
                 return None
 
@@ -58,7 +60,8 @@ class PostParser(BaseTransformer):
                 parsed_at=datetime.now(UTC),
             )
 
-            val_result = self.validator.validate(vacancy)
+            validation_now = post_date if self.ignore_date_window else None
+            val_result = self.validator.validate(vacancy, now=validation_now)
             if not val_result.is_valid:
                 logger.warning(
                     "Vacancy validation failed for url=%s. Reasons: %s",
