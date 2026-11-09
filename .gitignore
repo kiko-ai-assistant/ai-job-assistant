@@ -1,6 +1,8 @@
 # Environments & Secrets
 .env
 .env.local
+*.session
+*.session-journal
 .venv/
 env/
 venv/
@@ -19,6 +21,9 @@ data/cvs/*
 !data/cvs/.gitkeep
 data/logs/*
 !data/logs/.gitkeep
+apps/parsers/telegram/data/sessions/
+apps/parsers/telegram/data/output/
+apps/parsers/telegram/data/*.sqlite
 
 # Python
 __pycache__/
