@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 
 import httpx
@@ -15,12 +16,14 @@ def _create_sample_vacancy() -> CreateVacancyRequest:
         source="telegram",
         title="Backend Developer",
         company="TechCorp",
-        salary=SalaryDTO.model_validate({
-            "text": "200k",
-            "from": 200000,
-            "to": 250000,
-            "currency": "RUB",
-        }),
+        salary=SalaryDTO.model_validate(
+            {
+                "text": "200k",
+                "from": 200000,
+                "to": 250000,
+                "currency": "RUB",
+            }
+        ),
         grade="middle",
         employment_types=["remote"],
         location=LocationDTO(text="Remote", country="Russia", city="Moscow"),
@@ -52,6 +55,9 @@ async def test_backend_api_sink_sends_batch_with_headers_and_payload() -> None:
     backend_url = "http://backend.local/api/v1"
     api_key = "secret_key"
     vacancy = _create_sample_vacancy()
+    vacancy.raw_text = "Internal collection data"
+    assert vacancy.salary is not None
+    vacancy.salary.gross = True
 
     with respx.mock(base_url=backend_url) as respx_mock:
         route = respx_mock.post("/vacancies/batch").respond(
@@ -71,10 +77,30 @@ async def test_backend_api_sink_sends_batch_with_headers_and_payload() -> None:
         assert last_request.headers["Content-Type"] == "application/json"
 
         body = last_request.content.decode()
+        serialized = json.loads(body)["vacancies"][0]
+        assert "raw_text" not in serialized
+        assert "gross" not in serialized["salary"]
         assert "job_123" in body
         assert '"from":200000' in body or '"from": 200000' in body
 
         await sink.close()
+
+
+@pytest.mark.asyncio
+async def test_backend_api_sink_omits_absent_optional_objects() -> None:
+    vacancy = _create_sample_vacancy()
+    vacancy.salary = None
+    vacancy.location = None
+    with respx.mock as mock:
+        route = mock.post("http://backend.local/api/v1/vacancies/batch").respond(
+            200, json={"inserted": 1, "ignored": 0}
+        )
+        async with BackendApiSink("http://backend.local/api/v1", "key") as sink:
+            await sink.send_batch([vacancy])
+    serialized = json.loads(route.calls.last.request.content)["vacancies"][0]
+    assert "salary" not in serialized
+    assert "location" not in serialized
+    assert "raw_text" not in serialized
 
 
 @pytest.mark.asyncio

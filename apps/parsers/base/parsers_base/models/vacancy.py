@@ -51,8 +51,8 @@ class BatchCreateVacanciesRequest(BaseModel):
 class BatchCreateVacanciesResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    inserted: int
-    ignored: int
+    inserted: int = Field(strict=True)
+    ignored: int = Field(strict=True)
 
 
 BatchIngestVacanciesResponse = BatchCreateVacanciesResponse
