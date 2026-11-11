@@ -42,7 +42,11 @@ class BackendApiSink(BaseSink):
         try:
             response = await self.client.post(
                 "/vacancies/batch",
-                content=payload.model_dump_json(by_alias=True),
+                content=payload.model_dump_json(
+                    by_alias=True,
+                    exclude_none=True,
+                    exclude={"vacancies": {"__all__": {"raw_text": True, "salary": {"gross"}}}},
+                ),
             )
             response.raise_for_status()
             data = response.json()
