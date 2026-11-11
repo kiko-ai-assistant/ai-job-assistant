@@ -1,5 +1,10 @@
-from dataclasses import dataclass, field
+import math
 import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from urllib.parse import urlsplit
+
+APP_DIR = Path(__file__).resolve().parent
 
 
 @dataclass(frozen=True)
@@ -23,8 +28,8 @@ class SearchConfig:
 
 @dataclass(frozen=True)
 class StorageConfig:
-    path: str = "output/vacancies.json"
-    unavailable_path: str = "output/unavailable.json"
+    path: str = str(APP_DIR / "output/vacancies.json")
+    unavailable_path: str = str(APP_DIR / "output/unavailable.json")
     refresh_after_hours: float = 24.0
 
 
@@ -50,6 +55,36 @@ class AppConfig:
     storage: StorageConfig = field(default_factory=StorageConfig)
     failures: FailurePolicyConfig = field(default_factory=FailurePolicyConfig)
     alerts: AlertConfig = field(default_factory=AlertConfig)
+
+
+@dataclass(frozen=True)
+class BackendConfig:
+    base_url: str
+    api_key: str = field(repr=False)
+    batch_size: int = 50
+    timeout_seconds: float = 15.0
+
+    @classmethod
+    def from_env(cls) -> "BackendConfig":
+        base_url = os.environ.get("BACKEND_URL", "").strip()
+        api_key = os.environ.get("PARSER_API_KEY", "").strip()
+        if not base_url or not api_key:
+            raise ValueError("BACKEND_URL and PARSER_API_KEY must be set")
+        parsed = urlsplit(base_url)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("BACKEND_URL must be an HTTP(S) API base URL without credentials")
+        batch_size = int(os.environ.get("BACKEND_BATCH_SIZE", "50"))
+        timeout = float(os.environ.get("BACKEND_TIMEOUT_SECONDS", "15"))
+        if batch_size <= 0 or not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("Backend batch size and timeout must be positive")
+        return cls(base_url.rstrip("/"), api_key, batch_size, timeout)
 
 
 CONFIG = AppConfig()

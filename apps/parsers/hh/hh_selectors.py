@@ -13,5 +13,7 @@ SELECTORS = {
         "salary": '[data-qa="vacancy-salary"]',
         "location": '[data-qa="vacancy-view-raw-address"]',
         "description": '[data-qa="vacancy-description"]',
+        "work_format": '[data-qa="work-formats"], [data-qa="vacancy-view-work-format"]',
+        "employment": '[data-qa="vacancy-view-employment-mode"]',
     },
 }

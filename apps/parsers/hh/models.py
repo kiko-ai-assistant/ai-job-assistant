@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
@@ -13,6 +13,13 @@ class Vacancy:
     url: str
     created_at: str | None
     parsed_at: str | None
+    grade: str | None = None
+    employment_types: list[str] = field(default_factory=list)
+    salary_from: int | None = None
+    salary_to: int | None = None
+    salary_currency: str | None = None
+    location_country: str | None = None
+    location_city: str | None = None
 
     @property
     def key(self) -> tuple[str, str]:

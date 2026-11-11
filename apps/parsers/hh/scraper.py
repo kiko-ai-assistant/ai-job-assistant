@@ -92,6 +92,7 @@ class HHScraper:
                     page = self.requests.get(url)
 
                     if page.status != 200:
+                        stats.failed += 1
                         self.logger.error(
                             "Search target %s page %s returned HTTP %s",
                             target.name,

@@ -65,7 +65,7 @@ def test_429_respects_retry_path(monkeypatch):
 def test_captcha_detection(monkeypatch):
     response = FakePage(
         200,
-        body="Подтвердите, что вы не робот".encode("utf-8"),
+        body="Подтвердите, что вы не робот".encode(),
     )
     monkeypatch.setattr(module, "_fetch", lambda *a, **k: response)
 

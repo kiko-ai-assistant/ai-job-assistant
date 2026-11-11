@@ -1,7 +1,7 @@
 import logging
 import random
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
 from config import RequestConfig
@@ -11,6 +11,7 @@ from models import HttpStats
 
 def _fetch(url: str, **kwargs):
     from scrapling.fetchers import Fetcher
+
     return Fetcher.get(url, **kwargs)
 
 
@@ -39,11 +40,14 @@ class RequestManager:
     def _looks_like_captcha(page) -> bool:
         url = str(page.url).lower()
 
-        if any(marker in url for marker in (
-            "/captcha",
-            "captcha?",
-            "account/captcha",
-        )):
+        if any(
+            marker in url
+            for marker in (
+                "/captcha",
+                "captcha?",
+                "account/captcha",
+            )
+        ):
             return True
 
         # A real search page with vacancy cards is not a CAPTCHA page.
@@ -79,10 +83,10 @@ class RequestManager:
         try:
             target = parsedate_to_datetime(value)
             if target.tzinfo is None:
-                target = target.replace(tzinfo=timezone.utc)
+                target = target.replace(tzinfo=UTC)
             return max(
                 0.0,
-                (target - datetime.now(timezone.utc)).total_seconds(),
+                (target - datetime.now(UTC)).total_seconds(),
             )
         except Exception:
             return None
@@ -90,7 +94,7 @@ class RequestManager:
     def _backoff(self, attempt: int) -> float:
         return min(
             self.config.max_backoff_seconds,
-            self.config.backoff_base_seconds * (2 ** attempt),
+            self.config.backoff_base_seconds * (2**attempt),
         )
 
     def _headers(self) -> dict[str, str] | None:
@@ -148,9 +152,7 @@ class RequestManager:
             self.logger.info("GET %s -> %s", page.url, page.status)
 
             if self._looks_like_captcha(page):
-                raise CaptchaDetectedError(
-                    f"CAPTCHA detected at {page.url}"
-                )
+                raise CaptchaDetectedError(f"CAPTCHA detected at {page.url}")
 
             if page.status == 403:
                 if attempt >= self.config.max_retries:

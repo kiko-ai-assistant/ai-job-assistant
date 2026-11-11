@@ -1,66 +1,59 @@
 import logging
+from collections.abc import AsyncIterator
+from typing import Any
 
-import httpx
+from parsers_base import (
+    BaseParser,
+    BaseSink,
+    BatchCreateVacanciesResponse,
+    CreateVacancyRequest,
+    SinkError,
+    VacancyValidator,
+)
 
-from config import BackendConfig
-from models import Vacancy
+from json_storage import JsonVacancyStorage
+from transformer import to_create_vacancy
+
+logger = logging.getLogger(__name__)
 
 
-class BackendClient:
+class HHBackendParser(BaseParser):
     def __init__(
         self,
-        config: BackendConfig,
-        logger: logging.Logger,
-    ):
-        self.config = config
-        self.logger = logger
+        storage: JsonVacancyStorage,
+        sink: BaseSink,
+        batch_size: int = 50,
+    ) -> None:
+        super().__init__(sink, VacancyValidator(allowed_sources={"hh"}), batch_size)
+        self.storage = storage
+        self.conversion_errors = 0
+        self._raw_keys: dict[int, tuple[str, str]] = {}
 
-    def _headers(self) -> dict[str, str]:
-        headers = {
-            "Content-Type": "application/json",
-        }
+    async def parse(self, **kwargs: Any) -> AsyncIterator[CreateVacancyRequest]:
+        self.conversion_errors = 0
+        self._raw_keys.clear()
+        for vacancy in self.storage.pending():
+            try:
+                item = to_create_vacancy(vacancy)
+            except ValueError as exc:
+                self.conversion_errors += 1
+                logger.warning("Keeping vacancy %s pending: %s", vacancy.external_id, exc)
+                continue
+            self._raw_keys[id(item)] = vacancy.key
+            yield item
 
-        if self.config.api_key:
-            headers["Authorization"] = f"Bearer {self.config.api_key}"
-
-        return headers
-
-    def send_vacancies(self, vacancies: list[Vacancy]) -> None:
-        if not vacancies:
-            self.logger.info("No vacancies to send")
-            return
-
-        endpoint = (
-            self.config.base_url.rstrip("/")
-            + "/"
-            + self.config.bulk_path.lstrip("/")
-        )
-
-        batch_size = self.config.batch_size
-
-        with httpx.Client(
-            timeout=self.config.timeout_seconds,
-            headers=self._headers(),
-        ) as client:
-            for start in range(0, len(vacancies), batch_size):
-                batch = vacancies[start:start + batch_size]
-
-                payload = {
-                    "vacancies": [
-                        vacancy.to_dict()
-                        for vacancy in batch
-                    ]
-                }
-
-                response = client.post(
-                    endpoint,
-                    json=payload,
-                )
-
-                response.raise_for_status()
-
-                self.logger.info(
-                    "Sent %s vacancies to backend; HTTP %s",
-                    len(batch),
-                    response.status_code,
-                )
+    async def on_batch_sent(
+        self,
+        batch: list[CreateVacancyRequest],
+        response: BatchCreateVacanciesResponse,
+    ) -> None:
+        if (
+            response.inserted < 0
+            or response.ignored < 0
+            or response.inserted + response.ignored != len(batch)
+        ):
+            raise SinkError("Backend batch counters do not acknowledge the complete batch")
+        keys = [self._raw_keys[id(vacancy)] for vacancy in batch]
+        self.storage.mark_delivered(keys)
+        for vacancy in batch:
+            del self._raw_keys[id(vacancy)]

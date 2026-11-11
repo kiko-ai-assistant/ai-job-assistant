@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <script type="application/ld+json">
+    {"@type": "WebPage", "datePosted": "1999-01-01T00:00:00Z"}
+  </script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [{
+        "@type": "JobPosting",
+        "identifier": {"@type": "PropertyValue", "value": "123"},
+        "datePosted": "2026-11-11T10:00:00+03:00",
+        "jobLocationType": "TELECOMMUTE",
+        "employmentType": "FULL_TIME",
+        "baseSalary": {
+          "@type": "MonetaryAmount",
+          "currency": "RUB",
+          "value": {
+            "@type": "QuantitativeValue",
+            "minValue": 150000,
+            "maxValue": 200000,
+            "unitText": "MONTH"
+          }
+        },
+        "jobLocation": {
+          "@type": "Place",
+          "address": {
+            "@type": "PostalAddress",
+            "addressCountry": "RU",
+            "addressLocality": "Москва"
+          }
+        }
+      }]
+    }
+  </script>
+</head>
+<body>
+  <h1 data-qa="vacancy-title">Senior Python Developer</h1>
+  <div data-qa="vacancy-company-name">Example Company</div>
+  <div data-qa="vacancy-salary">от 150 000 до 200 000 ₽ за месяц</div>
+  <div data-qa="vacancy-view-raw-address">Москва</div>
+  <div data-qa="work-formats">Формат работы: удалённо</div>
+  <div data-qa="vacancy-view-employment-mode">Полная занятость</div>
+  <div data-qa="vacancy-description">
+    <p>Build and maintain Python services for a product team</p>
+    <p>Design reliable APIs, review changes and investigate production incidents</p>
+    <p>Work with PostgreSQL, HTTP services and automated tests</p>
+    <p>Document technical decisions and collaborate with engineers on delivery</p>
+    <p>Improve observability and support the long term maintenance of backend services</p>
+  </div>
+</body>
+</html>

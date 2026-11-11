@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -16,7 +16,7 @@ class Alerter:
         payload = {
             "event": event,
             "message": message,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "context": context,
         }
 
@@ -45,15 +45,10 @@ class Alerter:
         if not token or not chat_id:
             return
 
-        context_text = "\n".join(
-            f"{key}: {value}"
-            for key, value in payload["context"].items()
-        )
+        context_text = "\n".join(f"{key}: {value}" for key, value in payload["context"].items())
 
         text = (
-            f"HH scraper alert: {payload['event']}\n"
-            f"{payload['message']}\n"
-            f"{context_text}"
+            f"HH scraper alert: {payload['event']}\n{payload['message']}\n{context_text}"
         ).strip()
 
         try:
