@@ -13,12 +13,12 @@ from parsers_base.sink.base import BaseSink
 from parsers_base.validation.validator import VacancyValidator
 
 from .config import BASE_URL
-from .filters import SearchFilters
-from .grade import Grade
-from .http_client import FetchError, HtmlFetcher
-from .list_page import extract_vacancy_ids
-from .mapper import to_create_request
-from .vacancy_page import VacancyPageError, parse_vacancy_page
+from .domain.filters import SearchFilters
+from .domain.grade import Grade
+from .transport.http_client import FetchError, HtmlFetcher
+from .site.list_page import extract_vacancy_ids
+from .mapping.mapper import to_create_request
+from .site.vacancy_page import VacancyPageError, parse_vacancy_page
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,9 @@ class HabrParser(BaseParser):
         seen_ids: set[str] = set()
         for grade in grades:
             async for ids in self._iter_id_pages(filters, grade, max_pages, seen_ids):
-                loaded = await asyncio.gather(*(self._load_vacancy(i, grade) for i in ids))
+                loaded = await asyncio.gather(
+                    *(self._load_vacancy(i, grade) for i in ids)
+                )
                 for vacancy in loaded:
                     if vacancy is not None:
                         yield vacancy
@@ -75,7 +77,9 @@ class HabrParser(BaseParser):
         """Yield the not yet seen vacancy ids of every list page, until the results end."""
         for page in range(1, max_pages + 1):
             try:
-                html = await self._fetcher.get_text(LIST_PATH, filters.to_params(grade, page))
+                html = await self._fetcher.get_text(
+                    LIST_PATH, filters.to_params(grade, page)
+                )
             except FetchError as exc:
                 logger.warning("Stopping %s search on page %d: %s", grade, page, exc)
                 return
@@ -88,7 +92,9 @@ class HabrParser(BaseParser):
             seen_ids.update(new_ids)
             yield new_ids
 
-    async def _load_vacancy(self, vacancy_id: str, grade: Grade) -> CreateVacancyRequest | None:
+    async def _load_vacancy(
+        self, vacancy_id: str, grade: Grade
+    ) -> CreateVacancyRequest | None:
         path = f"{LIST_PATH}/{vacancy_id}"
         try:
             page = parse_vacancy_page(await self._fetcher.get_text(path))

@@ -1,43 +1,14 @@
 from datetime import UTC, datetime
 
-from habr_parser.filters import SearchFilters
-from habr_parser.grade import Grade
-from habr_parser.http_client import FetchError
+from habr_parser.domain.filters import SearchFilters
+from habr_parser.domain.grade import Grade
+from habr_parser.transport.http_client import (
+    FetchError,
+)
 from habr_parser.parser import HabrParser
-from parsers_base.sink.base import BaseSink
-from tests.builders import make_list_html, make_vacancy_html
+from tests.fakes import FakeFetcher, NullSink
 
 PARSED_AT = datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
-
-
-class FakeFetcher:
-    """Routes list pages by (qid, page) and vacancy pages by path."""
-
-    def __init__(self, lists=None, vacancies=None):
-        self.lists = lists or {}  # {(qid, page): [ids] | Exception}
-        self.vacancies = vacancies or {}  # {id: html | Exception}
-        self.calls: list[tuple[str, dict | None]] = []
-
-    async def get_text(self, path, params=None):
-        self.calls.append((path, params))
-        if path == "/vacancies":
-            result = self.lists.get((params["qid"], params["page"]), [])
-            if isinstance(result, Exception):
-                raise result
-            return make_list_html(result)
-        vacancy_id = path.rsplit("/", 1)[-1]
-        result = self.vacancies.get(vacancy_id, make_vacancy_html(title=f"Dev {vacancy_id}"))
-        if isinstance(result, Exception):
-            raise result
-        return result
-
-
-class NullSink(BaseSink):
-    async def send_batch(self, vacancies):
-        raise AssertionError("parse() must not touch the sink")
-
-    async def close(self):
-        pass
 
 
 def make_parser(fetcher):
@@ -54,7 +25,9 @@ async def test_all_pages_of_a_grade_are_walked_until_an_empty_page():
     vacancies = await collect(make_parser(fetcher), grades=[Grade.JUNIOR])
 
     assert [v.external_id for v in vacancies] == ["1", "2", "3"]
-    list_calls = [params["page"] for path, params in fetcher.calls if path == "/vacancies"]
+    list_calls = [
+        params["page"] for path, params in fetcher.calls if path == "/vacancies"
+    ]
     assert list_calls == [1, 2, 3]
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from habr_parser.salary import build_salary
+from habr_parser.mapping.salary import build_salary
 
 
 def monetary(currency="RUR", **value):

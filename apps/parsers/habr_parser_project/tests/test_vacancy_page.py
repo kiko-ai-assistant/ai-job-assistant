@@ -2,8 +2,16 @@ from datetime import UTC, datetime
 
 import pytest
 
-from habr_parser.vacancy_page import VacancyPageError, parse_vacancy_page
-from tests.builders import ld_script, make_job_posting, make_vacancy_html, page_with_scripts
+from habr_parser.site.vacancy_page import (
+    VacancyPageError,
+    parse_vacancy_page,
+)
+from tests.builders import (
+    ld_script,
+    make_job_posting,
+    make_vacancy_html,
+    page_with_scripts,
+)
 
 
 def test_job_posting_fields_are_extracted():
@@ -37,7 +45,9 @@ def test_unrelated_json_ld_blocks_are_skipped():
     assert parse_vacancy_page(html).title == "Python-разработчик"
 
 
-@pytest.mark.parametrize("wrap", [lambda p: [p], lambda p: {"@graph": [{"@type": "WebPage"}, p]}])
+@pytest.mark.parametrize(
+    "wrap", [lambda p: [p], lambda p: {"@graph": [{"@type": "WebPage"}, p]}]
+)
 def test_job_posting_is_found_in_lists_and_graphs(wrap):
     html = page_with_scripts(ld_script(wrap(make_job_posting())))
 

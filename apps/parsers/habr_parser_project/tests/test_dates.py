@@ -2,7 +2,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from habr_parser.dates import parse_iso_datetime
+from habr_parser.mapping.dates import (
+    parse_iso_datetime,
+)
 
 
 @pytest.mark.parametrize(

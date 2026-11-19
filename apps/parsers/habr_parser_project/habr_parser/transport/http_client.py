@@ -9,7 +9,7 @@ from typing import Any, Protocol
 
 import httpx
 
-from .config import HttpConfig
+from ..config import HttpConfig
 
 _RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
@@ -19,7 +19,9 @@ class FetchError(Exception):
 
 
 class HtmlFetcher(Protocol):
-    async def get_text(self, path: str, params: Mapping[str, Any] | None = None) -> str: ...
+    async def get_text(
+        self, path: str, params: Mapping[str, Any] | None = None
+    ) -> str: ...
 
 
 class HabrHttpClient:
@@ -35,7 +37,10 @@ class HabrHttpClient:
         self._slots = asyncio.Semaphore(self._config.concurrency)
         self._client = httpx.AsyncClient(
             base_url=self._config.base_url,
-            headers={"User-Agent": self._config.user_agent, "Accept-Language": "ru,en;q=0.8"},
+            headers={
+                "User-Agent": self._config.user_agent,
+                "Accept-Language": "ru,en;q=0.8",
+            },
             timeout=self._config.timeout,
             follow_redirects=True,
             transport=transport,
@@ -62,7 +67,9 @@ class HabrHttpClient:
     ) -> None:
         await self.aclose()
 
-    async def _get_with_retries(self, path: str, params: Mapping[str, Any] | None) -> str:
+    async def _get_with_retries(
+        self, path: str, params: Mapping[str, Any] | None
+    ) -> str:
         attempts = self._config.max_retries + 1
         last_problem = "no attempt made"
         for attempt in range(attempts):

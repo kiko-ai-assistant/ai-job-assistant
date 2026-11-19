@@ -5,8 +5,10 @@ import json
 import httpx
 
 from habr_parser.config import SOURCE_NAME, HttpConfig
-from habr_parser.grade import Grade
-from habr_parser.http_client import HabrHttpClient
+from habr_parser.domain.grade import Grade
+from habr_parser.transport.http_client import (
+    HabrHttpClient,
+)
 from habr_parser.parser import HabrParser
 from parsers_base.sink.backend_api import BackendApiSink
 from parsers_base.validation.validator import VacancyValidator
@@ -21,7 +23,9 @@ def habr_handler(request: httpx.Request) -> httpx.Response:
         page = int(request.url.params["page"])
         return httpx.Response(200, text=make_list_html([1, 2, 3] if page == 1 else []))
     if path == "/vacancies/3":
-        return httpx.Response(200, text=make_vacancy_html(description=SHORT_DESCRIPTION))
+        return httpx.Response(
+            200, text=make_vacancy_html(description=SHORT_DESCRIPTION)
+        )
     vacancy_id = path.rsplit("/", 1)[-1]
     return httpx.Response(200, text=make_vacancy_html(title=f"Dev {vacancy_id}"))
 
@@ -47,7 +51,10 @@ async def test_valid_vacancies_reach_the_backend_in_contract_shape():
     )
     sink = BackendApiSink("http://backend/api/v1", "key", client=backend)
     parser = HabrParser(
-        sink, fetcher, validator=VacancyValidator(allowed_sources={SOURCE_NAME}), batch_size=10
+        sink,
+        fetcher,
+        validator=VacancyValidator(allowed_sources={SOURCE_NAME}),
+        batch_size=10,
     )
 
     stats = await parser.run(grades=[Grade.MIDDLE], max_pages=2)

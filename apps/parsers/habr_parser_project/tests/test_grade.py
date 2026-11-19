@@ -1,6 +1,6 @@
 import pytest
 
-from habr_parser.grade import Grade
+from habr_parser.domain.grade import Grade
 
 
 def test_values_match_the_openapi_grade_enum():

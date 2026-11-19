@@ -1,9 +1,13 @@
 from datetime import UTC, datetime
 
 from habr_parser.config import SOURCE_NAME
-from habr_parser.grade import Grade
-from habr_parser.mapper import to_create_request
-from habr_parser.vacancy_page import parse_vacancy_page
+from habr_parser.domain.grade import Grade
+from habr_parser.mapping.mapper import (
+    to_create_request,
+)
+from habr_parser.site.vacancy_page import (
+    parse_vacancy_page,
+)
 from parsers_base.validation.rules import MAX_DESCRIPTION_LEN
 from parsers_base.validation.validator import VacancyValidator
 from tests.builders import SENTENCE, make_vacancy_html

@@ -10,7 +10,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from .dates import parse_iso_datetime
+from ..mapping.dates import parse_iso_datetime
 
 
 class VacancyPageError(ValueError):
@@ -74,7 +74,9 @@ def _iter_nodes(data: Any) -> Iterator[Mapping[str, Any]]:
 
 def _is_job_posting(node: Mapping[str, Any]) -> bool:
     node_type = node.get("@type")
-    return node_type == "JobPosting" or (isinstance(node_type, list) and "JobPosting" in node_type)
+    return node_type == "JobPosting" or (
+        isinstance(node_type, list) and "JobPosting" in node_type
+    )
 
 
 def _required_text(posting: Mapping[str, Any], key: str) -> str:
@@ -85,7 +87,9 @@ def _required_text(posting: Mapping[str, Any], key: str) -> str:
 
 
 def _company_name(organization: Any) -> str | None:
-    name = organization.get("name") if isinstance(organization, Mapping) else organization
+    name = (
+        organization.get("name") if isinstance(organization, Mapping) else organization
+    )
     if not isinstance(name, str):
         return None
     return name.strip() or None

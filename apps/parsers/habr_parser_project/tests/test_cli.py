@@ -1,8 +1,8 @@
 import pytest
 
-from habr_parser.cli import parse_cli
-from habr_parser.filters import SearchFilters
-from habr_parser.grade import Grade
+from habr_parser.cli.cli import parse_cli
+from habr_parser.domain.filters import SearchFilters
+from habr_parser.domain.grade import Grade
 
 
 def test_defaults_search_all_grades_without_filters():
@@ -12,6 +12,7 @@ def test_defaults_search_all_grades_without_filters():
     assert options.grades == tuple(Grade)
     assert options.max_pages == 5
     assert options.batch_size == 50
+    assert options.dry_run is False
 
 
 def test_arguments_are_mapped_to_options():
@@ -50,3 +51,7 @@ def test_arguments_are_mapped_to_options():
 def test_unknown_grade_is_rejected():
     with pytest.raises(SystemExit):
         parse_cli(["--grade", "wizard"])
+
+
+def test_dry_run_flag():
+    assert parse_cli(["--dry-run"]).dry_run is True

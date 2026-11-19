@@ -1,8 +1,13 @@
-from habr_parser.description import html_to_text, truncate_text
+from habr_parser.mapping.description import (
+    html_to_text,
+    truncate_text,
+)
 
 
 def test_blocks_and_list_items_go_on_separate_lines():
-    html = "<p>Обязанности:</p><ul><li>Писать код</li><li>Ревьюить</li></ul><p>Итого</p>"
+    html = (
+        "<p>Обязанности:</p><ul><li>Писать код</li><li>Ревьюить</li></ul><p>Итого</p>"
+    )
 
     assert html_to_text(html) == "Обязанности:\n• Писать код\n• Ревьюить\nИтого"
 

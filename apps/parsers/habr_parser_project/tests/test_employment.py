@@ -1,6 +1,8 @@
 import pytest
 
-from habr_parser.employment import map_employment_types
+from habr_parser.domain.employment import (
+    map_employment_types,
+)
 
 
 @pytest.mark.parametrize(
@@ -15,5 +17,7 @@ from habr_parser.employment import map_employment_types
         ("telecommute", "contractor", ["REMOTE", "CONTRACT"]),
     ],
 )
-def test_mapping_always_returns_at_least_one_known_type(location_type, employment, expected):
+def test_mapping_always_returns_at_least_one_known_type(
+    location_type, employment, expected
+):
     assert map_employment_types(location_type, employment) == expected

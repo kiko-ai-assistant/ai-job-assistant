@@ -1,4 +1,6 @@
-from habr_parser.list_page import extract_vacancy_ids
+from habr_parser.site.list_page import (
+    extract_vacancy_ids,
+)
 from tests.builders import make_list_html
 
 

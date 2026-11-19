@@ -4,7 +4,10 @@ import httpx
 import pytest
 
 from habr_parser.config import HttpConfig
-from habr_parser.http_client import FetchError, HabrHttpClient
+from habr_parser.transport.http_client import (
+    FetchError,
+    HabrHttpClient,
+)
 
 
 def make_client(handler, **config):

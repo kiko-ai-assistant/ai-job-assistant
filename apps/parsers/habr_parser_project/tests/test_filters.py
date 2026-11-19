@@ -2,8 +2,8 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from habr_parser.filters import SearchFilters
-from habr_parser.grade import Grade
+from habr_parser.domain.filters import SearchFilters
+from habr_parser.domain.grade import Grade
 
 
 def test_default_filters_only_send_paging_and_grade():

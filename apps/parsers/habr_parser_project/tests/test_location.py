@@ -1,4 +1,4 @@
-from habr_parser.location import build_location
+from habr_parser.mapping.location import build_location
 
 
 def place(**address):
@@ -15,7 +15,11 @@ def test_city_and_country():
 def test_country_only():
     location = build_location(place(addressCountry="Беларусь"))
 
-    assert (location.city, location.country, location.text) == (None, "Беларусь", "Беларусь")
+    assert (location.city, location.country, location.text) == (
+        None,
+        "Беларусь",
+        "Беларусь",
+    )
 
 
 def test_city_without_country_is_kept_only_in_text():
@@ -28,7 +32,10 @@ def test_city_without_country_is_kept_only_in_text():
 
 def test_first_place_of_a_list_is_used():
     location = build_location(
-        [place(addressLocality="Минск", addressCountry="BY"), place(addressLocality="Москва")]
+        [
+            place(addressLocality="Минск", addressCountry="BY"),
+            place(addressLocality="Москва"),
+        ]
     )
 
     assert location.city == "Минск"
@@ -36,7 +43,10 @@ def test_first_place_of_a_list_is_used():
 
 def test_country_may_be_an_object_with_a_name():
     location = build_location(
-        place(addressLocality="Минск", addressCountry={"@type": "Country", "name": "Belarus"})
+        place(
+            addressLocality="Минск",
+            addressCountry={"@type": "Country", "name": "Belarus"},
+        )
     )
 
     assert location.country == "Belarus"
